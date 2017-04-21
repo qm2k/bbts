@@ -16,6 +16,9 @@ import shlex
 import subprocess
 
 
+CURRENT_DATETIME = datetime.datetime.now()
+
+
 def parse_burp_duration(duration_string,
     __regex = re.compile('(?P<number>\d+)(?P<unit>[smhdwn])'),
     __unit_to_seconds = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 7*86400, 'n': 30*86400}
@@ -39,13 +42,32 @@ def get_argument_parser():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('interval', type = parse_burp_duration)
     argument_parser.add_argument('--private-ip', action = 'store_true')
+    argument_parser.add_argument('--workday', action = 'store_true')
+    argument_parser.add_argument('--holiday', action = 'store_true')
+    argument_parser.add_argument('--hours-range', action = 'append')
     return argument_parser
+
+
+def match_hours_ranges(hours_ranges):
+    for hours_range in hours_ranges:
+        first_hour, last_hour = hours_range.split('..')
+        first_hour = int(first_hour) if first_hour else 0
+        last_hour = int(last_hour) if last_hour else 24
+        if first_hour <= CURRENT_DATETIME.hour <= last_hour:
+            return True
+    return False
 
 
 def get_interval(argument_strings, __argument_parser = get_argument_parser()):
     for argument_string in argument_strings:
         arguments = __argument_parser.parse_args(shlex.split(argument_string))
         if arguments.private_ip and not ipaddress.ip_address(os.environ['REMOTE_ADDR']).is_private:
+            continue
+        if arguments.workday and not CURRENT_DATETIME.weekday() < 5:
+            continue
+        if arguments.holiday and not CURRENT_DATETIME.weekday() >= 5:
+            continue
+        if arguments.hours_range and not match_hours_ranges(arguments.hours_range):
             continue
         return arguments.interval
     raise ValueError('Interval cannot be determined', argument_strings)
@@ -77,8 +99,7 @@ def is_backup_necessary(latest_path, interval):
     print('Last backup: {}, interval: {}'.format(latest_timestamp, interval))
 
     next_timestamp = latest_timestamp + interval
-    current_timestamp = datetime.datetime.now()
-    if next_timestamp < current_timestamp:
+    if next_timestamp < CURRENT_DATETIME:
         return True
 
     print('Next after : {}'.format(next_timestamp))
