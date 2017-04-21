@@ -10,6 +10,7 @@ import sys
 import argparse
 import datetime
 import gzip
+import ipaddress
 import re
 import shlex
 import subprocess
@@ -37,13 +38,17 @@ def get_backup_timestamp(path):
 def get_argument_parser():
     argument_parser = argparse.ArgumentParser()
     argument_parser.add_argument('interval', type = parse_burp_duration)
+    argument_parser.add_argument('--private-ip', action = 'store_true')
     return argument_parser
 
 
 def get_interval(argument_strings, __argument_parser = get_argument_parser()):
     for argument_string in argument_strings:
         arguments = __argument_parser.parse_args(shlex.split(argument_string))
+        if arguments.private_ip and not ipaddress.ip_address(os.environ['REMOTE_ADDR']).is_private:
+            continue
         return arguments.interval
+    raise ValueError('Interval cannot be determined', argument_strings)
 
 
 def is_backup_dubious(path,
