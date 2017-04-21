@@ -24,9 +24,6 @@ def parse_burp_duration(duration_string,
 
 
 def get_backup_timestamp(path):
-    if not os.path.exists(path):
-        return None
-
     timestamp_filename = os.path.join(path, 'timestamp')
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
@@ -38,9 +35,6 @@ def get_backup_timestamp(path):
 def is_backup_dubious(path,
     __interrupted_backup_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
 ):
-    if not os.path.exists(path):
-        return None
-
     log_filename = os.path.join(path, 'log.gz')
     with gzip.open(log_filename, 'rt') as log_file:
         for line in log_file:
@@ -48,6 +42,27 @@ def is_backup_dubious(path,
                 print('Backup was being interrupted.')
                 return True
 
+    return False
+
+
+def is_backup_necessary(latest_path, interval):
+    if not os.path.exists(latest_path):
+        print('No prior backup.')
+        return True
+
+    if is_backup_dubious(latest_path):
+        print('Prior backup is dubious.')
+        return True
+
+    latest_timestamp = get_backup_timestamp(latest_path)
+    print('Last backup: {}, interval: {}'.format(latest_timestamp, interval))
+
+    next_timestamp = latest_timestamp + interval
+    current_timestamp = datetime.datetime.now()
+    if next_timestamp < current_timestamp:
+        return True
+
+    print('Next after : {}'.format(next_timestamp))
     return False
 
 
@@ -59,24 +74,12 @@ def main(arguments):
     client_name, latest_path, data_path, _, _, interval_string = arguments[1:7]
     interval = parse_burp_duration(interval_string)
 
-    latest_timestamp = get_backup_timestamp(latest_path)
-    print('Last backup: {}'.format(latest_timestamp))
+    backup_is_necessary = is_backup_necessary(latest_path, interval)
+    if backup_is_necessary:
+        print('Do backup now.'.format(client_name))
+        return os.EX_OK
 
-    backup_is_dubious = is_backup_dubious(latest_path)
-    if backup_is_dubious:
-       pass
-    elif latest_timestamp:
-        print('Next after : {} (interval {})'.format(latest_timestamp + interval, interval_string))
-    else:
-        print('No prior backup of {}'.format(client_name))
-
-    current_timestamp = datetime.datetime.now()
-    if backup_is_dubious or not latest_timestamp or latest_timestamp + interval < current_timestamp:
-        print('Do a backup of {} now.'.format(client_name))
-        return 0
-    else:
-        print('Not yet time for a backup of {}.'.format(client_name))
-        return 1
+    return not os.EX_OK
 
 
 if __name__ == "__main__":
