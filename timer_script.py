@@ -7,9 +7,11 @@
 import os
 import sys
 
+import argparse
 import datetime
 import gzip
 import re
+import shlex
 import subprocess
 
 
@@ -30,6 +32,18 @@ def get_backup_timestamp(path):
         index, timestamp_string = line.split(' ', maxsplit = 1)
         timestamp = datetime.datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
         return timestamp
+
+
+def get_argument_parser():
+    argument_parser = argparse.ArgumentParser()
+    argument_parser.add_argument('interval', type = parse_burp_duration)
+    return argument_parser
+
+
+def get_interval(argument_strings, __argument_parser = get_argument_parser()):
+    for argument_string in argument_strings:
+        arguments = __argument_parser.parse_args(shlex.split(argument_string))
+        return arguments.interval
 
 
 def is_backup_dubious(path,
@@ -69,10 +83,11 @@ def is_backup_necessary(latest_path, interval):
 def main(arguments):
     '''Main function.'''
     if len(arguments) < 7 or '--help' in arguments:
-        sys.stderr.write('Usage: <client_name> <latest_path> <data_path> <reserverd1> <reserverd2> <interval>\n')
+        sys.stderr.write('Usage: <client_name> <latest_path> <data_path> <reserverd1> <reserverd2> <argument_strings>\n')
         return os.EX_USAGE
-    client_name, latest_path, data_path, _, _, interval_string = arguments[1:7]
-    interval = parse_burp_duration(interval_string)
+    client_name, latest_path, data_path = arguments[1:4]
+    argument_strings = arguments[6:]
+    interval = get_interval(argument_strings)
 
     backup_is_necessary = is_backup_necessary(latest_path, interval)
     if backup_is_necessary:
