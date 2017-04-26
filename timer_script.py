@@ -136,6 +136,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         return result
 
     conditions = (
+        Condition(name = 'new', argument_action = 'store_true', call = lambda: is_backup_new(prior_path)),
         Condition(name = 'continued', argument_action = 'store_true', call = lambda: is_backup_continued(prior_path)),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),

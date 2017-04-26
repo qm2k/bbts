@@ -128,6 +128,7 @@ class Test_check_conditions(unittest.TestCase):
     def test_new_backup(self):
         backup_path = get_backup_path('empty')
         assert not timer_script.check_conditions(backup_path)
+        assert timer_script.check_conditions(backup_path, '--new')
         assert timer_script.check_conditions(backup_path, '--age-exceeds 20h')
         assert not timer_script.check_conditions(backup_path, '--continued')
         with RemoteAddress('8.8.8.8'):
