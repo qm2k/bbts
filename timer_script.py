@@ -59,7 +59,7 @@ def get_backup_timestamp(backup_path):
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
 
 
-def match_argument_strings(latest_path, *argument_strings):
+def match_argument_strings(latest_path, *argument_strings, verbose = False):
 
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
@@ -89,24 +89,26 @@ def match_argument_strings(latest_path, *argument_strings):
                 continue
             condition_arguments = (argument_value,) if argument_value != True else ()
             if not condition.call(*condition_arguments):
+                verbose and print('Failed condition: --{} {}', condition.name, argument_value)
                 return False
         return True
 
     for argument_string in argument_strings:
         if match_conditions(vars(parser.parse_args(shlex.split(argument_string)))):
+            verbose and print('Matched: {}', argument_string)
             return True
 
     return False
 
 
-def is_backup_necessary(latest_path, *argument_strings):
+def is_backup_necessary(latest_path, *argument_strings, verbose = False):
     if not os.path.exists(latest_path):
         return True
 
     if is_backup_continued(latest_path):
         return True
 
-    return match_argument_strings(latest_path, *argument_strings)
+    return match_argument_strings(latest_path, *argument_strings, verbose = verbose)
 
 
 def main(arguments):
