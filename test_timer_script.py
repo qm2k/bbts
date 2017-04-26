@@ -110,13 +110,20 @@ class Test_get_backup_timestamp(unittest.TestCase):
         expected_result = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
         assert timer_script.get_backup_timestamp(get_backup_path('timestamp')) == expected_result
 
+    def test_dynamic(self):
+        backup_path = get_backup_path('dynamic_timestamp')
+        timestamp = datetime.datetime.now()
+        timer_script.write_timestamp(os.path.join(backup_path, 'timestamp'), timestamp)
+        expected_result = timestamp.replace(microsecond = 0)
+        assert timer_script.get_backup_timestamp(get_backup_path('dynamic_timestamp')) == expected_result
+
 
 class Test_check_conditions(unittest.TestCase):
 
     def setUp(self):
-        with open(os.path.join(get_backup_path('20h'), 'timestamp'), 'wt') as timestamp_file:
-            timestamp = datetime.datetime.now().replace(microsecond = 0) - datetime.timedelta(hours = 20)
-            timestamp_file.write('0000010 {}\n'.format(timestamp.isoformat(' ')))
+        filename = os.path.join(get_backup_path('20h'), 'timestamp')
+        timestamp = datetime.datetime.now() - datetime.timedelta(hours = 20)
+        timer_script.write_timestamp(filename, timestamp)
 
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())

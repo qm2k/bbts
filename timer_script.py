@@ -73,16 +73,25 @@ def is_backup_continued(backup_path,
     return False
 
 
-def get_backup_timestamp(backup_path, __new_timestamp = datetime.datetime(1, 1, 1)):
-    if is_backup_new(backup_path):
-        return __new_timestamp
-
-    timestamp_filename = os.path.join(backup_path, 'timestamp')
+def read_timestamp(timestamp_filename):
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
         index, timestamp_string = line.split(' ', maxsplit = 1)
         timestamp = datetime.datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
         return timestamp
+
+
+def write_timestamp(timestamp_filename, timestamp, index = 0):
+    with open(timestamp_filename, 'wt') as timestamp_file:
+        timestamp_file.write('{:07} {}\n'.format(index, timestamp.replace(microsecond = 0).isoformat(' ')))
+
+
+def get_backup_timestamp(backup_path, __new_timestamp = datetime.datetime(1, 1, 1)):
+    if is_backup_new(backup_path):
+        return __new_timestamp
+
+    timestamp_filename = os.path.join(backup_path, 'timestamp')
+    return read_timestamp(timestamp_filename)
 
 
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
