@@ -35,6 +35,25 @@ def parse_burp_duration(text,
     return datetime.timedelta(seconds = int(match.group('number')) * __unit_to_seconds[match.group('unit')])
 
 
+def parse_time_of_day(text,
+    __regex = re.compile('((?P<days>[+-]?\d+)[T ]|T?)(?P<hours>[+-]?\d+)(:(?P<minutes>[+-]?\d+)(:(?P<seconds>[+-]?\d+))?)?')
+):
+    match = match_full(__regex, text)
+    kwargs = {key: int(value) for key, value in match.groupdict().items() if value}
+    return datetime.timedelta(**kwargs)
+
+
+Interval = collections.namedtuple('Interval', ('start', 'end'))
+
+def parse_time_of_day_interval(text,
+    __regex = re.compile('(?P<start>[0-9:T +-]*[0-9T ])(/|--)(?P<end>[0-9:T +-]+)')
+):
+    match = match_full(__regex, text)
+    return Interval(
+        start = parse_time_of_day(match.group('start')),
+        end = parse_time_of_day(match.group('end')))
+
+
 def is_backup_continued(backup_path,
     __interrupted_backup_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
 ):
@@ -70,12 +89,23 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
     def age_exceeds(maximum_age_string):
         return CURRENT_DATETIME > get_backup_timestamp(latest_path) + parse_burp_duration(maximum_age_string)
 
+    def current_time_within(interval_strings):
+        current_time_of_day = CURRENT_DATETIME - datetime.datetime.combine(CURRENT_DATETIME.date(), datetime.time())
+        interval_strings = ','.join(interval_strings).split(',')
+        for interval_string in interval_strings:
+            interval = parse_time_of_day_interval(interval_string)
+            if interval.start <= current_time_of_day < interval.end:
+                verbose and print('Failed interval: {}', interval)
+                return True
+        return False
+
     conditions = (
         Condition(name = 'lan', argument_action = 'store_true', call = lambda: remote_address().is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = lambda: not remote_address().is_private),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
+        Condition(name = 'current_time', argument_action = 'append', call = current_time_within),
     )
 
     parser = argparse.ArgumentParser()

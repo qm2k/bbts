@@ -34,6 +34,58 @@ class Test_parse_burp_duration(unittest.TestCase):
         assert timer_script.parse_burp_duration('3d') == datetime.timedelta(days = 3)
 
 
+class Test_parse_time_of_day(unittest.TestCase):
+
+    def test_hour_only(self):
+        expected_result = datetime.timedelta(hours = 1)
+        assert timer_script.parse_time_of_day('1') == expected_result
+        assert timer_script.parse_time_of_day('T1') == expected_result
+
+    def test_time_only(self):
+        expected_result = datetime.timedelta(hours = 1, minutes = 2, seconds = 3)
+        assert timer_script.parse_time_of_day('01:02:03') == expected_result
+        assert timer_script.parse_time_of_day('T01:02:03') == expected_result
+
+    def test_time_and_day(self):
+        expected_result = datetime.timedelta(days = 1, hours = 2, minutes = 3, seconds = 4)
+        assert timer_script.parse_time_of_day('1 02:03:04') == expected_result
+        assert timer_script.parse_time_of_day('1T02:03:04') == expected_result
+
+    def test_negative(self):
+        expected_result = datetime.timedelta(days = -1, hours = -2, minutes = -3, seconds = -4)
+        assert timer_script.parse_time_of_day('-1 -02:-03:-04') == expected_result
+        assert timer_script.parse_time_of_day('-1T-02:-03:-04') == expected_result
+
+    def test_partial(self):
+        expected_result = datetime.timedelta(days = 1, hours = 2)
+        assert timer_script.parse_time_of_day('1T2') == expected_result
+        assert timer_script.parse_time_of_day('1 2') == expected_result
+        assert timer_script.parse_time_of_day('1T2:0') == expected_result
+        assert timer_script.parse_time_of_day('1 2:0') == expected_result
+
+    def test_hour_only(self):
+        expected_result = datetime.timedelta(hours = 1)
+        assert timer_script.parse_time_of_day('1') == expected_result
+        assert timer_script.parse_time_of_day('T1') == expected_result
+
+
+class Test_parse_time_of_day_interval(unittest.TestCase):
+
+    def test_constant(self):
+        expected_result = timer_script.Interval(
+            start = datetime.timedelta(days = 1, hours = 2, minutes = 3),
+            end = datetime.timedelta(days = 4, hours = 5, minutes = 6))
+        assert timer_script.parse_time_of_day_interval('1T2:3/4T5:6') == expected_result
+        assert timer_script.parse_time_of_day_interval('1T2:3--4T5:6') == expected_result
+
+    def test_negative(self):
+        expected_result = timer_script.Interval(
+            start = datetime.timedelta(days = -1, hours = 2, minutes = 3),
+            end = datetime.timedelta(days = -4, hours = 5, minutes = 6))
+        assert timer_script.parse_time_of_day_interval('-1T2:3/-4T5:6') == expected_result
+        assert timer_script.parse_time_of_day_interval('-1T2:3---4T5:6') == expected_result
+
+
 class Test_is_backup_continued(unittest.TestCase):
 
     def test_continued(self):
@@ -93,6 +145,35 @@ class Test_is_backup_necessary(unittest.TestCase):
         backup_path = get_backup_path('20h')
         assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h')
         assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h')
+
+    def test_current_time(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-25 14:46:05'):
+            assert timer_script.is_backup_necessary(backup_path, '--current-time 14:46--14:47')
+            assert timer_script.is_backup_necessary(backup_path, '--current-time 14:46:05--14:46:06')
+            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:45--14:46')
+            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:45:04--14:46:05')
+            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:47--14:48')
+
+    def test_current_time__multiple(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-25 14:46:05'):
+            assert timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14,14--15,16--17')
+            assert timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14', '--current-time 16--17,14--15')
+            assert timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14,14--15', '--current-time 16--17')
+            assert timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14', '--current-time 14--15', '--current-time 16--17')
+            assert not timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14,15--16,16--17')
+            assert not timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14', '--current-time 16--17,15--16')
+            assert not timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14,15--16', '--current-time 16--17')
+            assert not timer_script.is_backup_necessary(backup_path,
+                '--current-time 13--14', '--current-time 15--16', '--current-time 16--17')
 
     def test_binary_operations(self):
         backup_path = get_backup_path('20h')
