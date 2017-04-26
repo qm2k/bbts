@@ -78,7 +78,7 @@ def get_backup_timestamp(backup_path):
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
 
 
-def match_argument_strings(latest_path, *argument_strings, verbose = False):
+def match_argument_strings(prior_path, *argument_strings, verbose = False):
 
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
@@ -93,7 +93,7 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
         return CURRENT_DATETIME.weekday()
 
     def age_exceeds(maximum_age_string):
-        return CURRENT_DATETIME > get_backup_timestamp(latest_path) + parse_burp_duration(maximum_age_string)
+        return CURRENT_DATETIME > get_backup_timestamp(prior_path) + parse_burp_duration(maximum_age_string)
 
     def current_time_in(interval_string):
         current_time_of_day = CURRENT_DATETIME - datetime.datetime.combine(CURRENT_DATETIME.date(), datetime.time())
@@ -159,25 +159,25 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
     return False
 
 
-def is_backup_necessary(latest_path, *argument_strings, verbose = False):
-    if not os.path.exists(latest_path):
+def is_backup_necessary(prior_path, *argument_strings, verbose = False):
+    if not os.path.exists(prior_path):
         return True
 
-    if is_backup_continued(latest_path):
+    if is_backup_continued(prior_path):
         return True
 
-    return match_argument_strings(latest_path, *argument_strings, verbose = verbose)
+    return match_argument_strings(prior_path, *argument_strings, verbose = verbose)
 
 
 def main(arguments):
     '''Main function.'''
     if len(arguments) < 7 or '--help' in arguments:
-        sys.stderr.write('Usage: <client_name> <latest_path> <data_path> <reserverd1> <reserverd2> <argument_strings...>\n')
+        sys.stderr.write('Usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <argument_strings...>\n')
         return os.EX_USAGE
-    client_name, latest_path, data_path = arguments[1:4]
+    client_name, prior_path, data_path = arguments[1:4]
     argument_strings = arguments[6:]
 
-    return os.EX_OK if is_backup_necessary(latest_path, *argument_strings, verbose = True) else not os.EX_OK
+    return os.EX_OK if is_backup_necessary(prior_path, *argument_strings, verbose = True) else not os.EX_OK
 
 
 if __name__ == "__main__":
