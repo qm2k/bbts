@@ -149,31 +149,23 @@ class Test_is_backup_necessary(unittest.TestCase):
     def test_current_time(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-25 14:46:05'):
-            assert timer_script.is_backup_necessary(backup_path, '--current-time 14:46--14:47')
-            assert timer_script.is_backup_necessary(backup_path, '--current-time 14:46:05--14:46:06')
-            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:45--14:46')
-            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:45:04--14:46:05')
-            assert not timer_script.is_backup_necessary(backup_path, '--current-time 14:47--14:48')
+            assert timer_script.is_backup_necessary(backup_path, '--time 14:46--14:47')
+            assert timer_script.is_backup_necessary(backup_path, '--time 14:46:05--14:46:06')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 14:45--14:46')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 14:45:04--14:46:05')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 14:47--14:48')
 
     def test_current_time__multiple(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-25 14:46:05'):
-            assert timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14,14--15,16--17')
-            assert timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14', '--current-time 16--17,14--15')
-            assert timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14,14--15', '--current-time 16--17')
-            assert timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14', '--current-time 14--15', '--current-time 16--17')
-            assert not timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14,15--16,16--17')
-            assert not timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14', '--current-time 16--17,15--16')
-            assert not timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14,15--16', '--current-time 16--17')
-            assert not timer_script.is_backup_necessary(backup_path,
-                '--current-time 13--14', '--current-time 15--16', '--current-time 16--17')
+            assert timer_script.is_backup_necessary(backup_path, '--time 13--14,14--15,16--17')
+            assert timer_script.is_backup_necessary(backup_path, '--time 13--14', '--time 16--17,14--15')
+            assert timer_script.is_backup_necessary(backup_path, '--time 13--14,14--15', '--time 16--17')
+            assert timer_script.is_backup_necessary(backup_path, '--time 13--14', '--time 14--15', '--time 16--17')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 13--14,15--16,16--17')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 13--14', '--time 16--17,15--16')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 13--14,15--16', '--time 16--17')
+            assert not timer_script.is_backup_necessary(backup_path, '--time 13--14', '--time 15--16', '--time 16--17')
 
     def test_binary_operations(self):
         backup_path = get_backup_path('20h')

@@ -128,7 +128,7 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
-        Condition(name = 'current_time', argument_action = 'append', call = disjunction(current_time_in)),
+        Condition(name = 'time', argument_action = 'append', call = disjunction(current_time_in)),
     )
 
     parser = argparse.ArgumentParser()
