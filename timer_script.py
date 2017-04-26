@@ -172,7 +172,7 @@ def main(arguments):
     client_name, latest_path, data_path = arguments[1:4]
     argument_strings = arguments[6:]
 
-    return os.EX_OK if is_backup_necessary(latest_path, *argument_strings, verbose = True) else not os_EX_OK
+    return os.EX_OK if is_backup_necessary(latest_path, *argument_strings, verbose = True) else not os.EX_OK
 
 
 if __name__ == "__main__":
