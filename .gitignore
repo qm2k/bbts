@@ -2,4 +2,5 @@ __pycache__/
 *.pyc
 .*.swp
 /beta/
+_test_data/backups/20h/current/timestamp
 
