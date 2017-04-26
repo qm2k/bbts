@@ -95,7 +95,7 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
         for interval_string in interval_strings:
             interval = parse_time_of_day_interval(interval_string)
             if interval.start <= current_time_of_day < interval.end:
-                verbose and print('Failed interval: {}', interval)
+                verbose and print('Matched interval: {}', interval)
                 return True
         return False
 
