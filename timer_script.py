@@ -117,7 +117,7 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
             value_strings = ','.join(value_strings).split(',')
             for value_string in value_strings:
                 if condition(value_string):
-                    verbose and print('Matched item: {}', value_string)
+                    verbose and print('Matched item: {}'.format(value_string))
                     return True
             return False
         return result
@@ -142,13 +142,13 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
                 continue
             condition_arguments = (argument_value,) if argument_value != True else ()
             if not condition.call(*condition_arguments):
-                verbose and print('Failed condition: --{} {}', condition.name, argument_value)
+                verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
                 return False
         return True
 
     for argument_string in argument_strings:
         if match_conditions(vars(parser.parse_args(shlex.split(argument_string)))):
-            verbose and print('Matched: {}', argument_string)
+            verbose and print('Matched: {}'.format(argument_string))
             return True
 
     return False
