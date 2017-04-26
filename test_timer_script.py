@@ -46,8 +46,8 @@ class Test_is_backup_continued(unittest.TestCase):
 class Test_get_backup_timestamp(unittest.TestCase):
 
     def test_constant(self):
-        expected_timestamp = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
-        assert timer_script.get_backup_timestamp(get_backup_path('timestamp')) == expected_timestamp
+        expected_result = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
+        assert timer_script.get_backup_timestamp(get_backup_path('timestamp')) == expected_result
 
 
 class Test_is_backup_necessary(unittest.TestCase):
