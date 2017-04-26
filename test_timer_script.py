@@ -18,6 +18,16 @@ def get_backup_path(backup_name = 'default'):
     return os.path.join(TEST_BACKUPS, backup_name, 'current')
 
 
+class FakeTime(object):
+    def __init__(self, text):
+        self.fake_datetime = datetime.datetime.strptime(text, '%Y-%m-%d %H:%M:%S')
+    def __enter__(self):
+        self.saved_datetime = timer_script.CURRENT_DATETIME
+        timer_script.CURRENT_DATETIME = self.fake_datetime
+    def __exit__(self, type, value, traceback):
+        timer_script.CURRENT_DATETIME = self.saved_datetime
+
+
 class Test_parse_burp_duration(unittest.TestCase):
 
     def test_constant(self):
@@ -69,22 +79,15 @@ class Test_is_backup_necessary(unittest.TestCase):
 
     def test_weekday(self):
         backup_path = get_backup_path()
-        import timer_script
-        saved_datetime = timer_script.CURRENT_DATETIME
-        try:
-            timer_script.CURRENT_DATETIME = datetime.datetime.strptime('2017-04-25 14:46:05', '%Y-%m-%d %H:%M:%S')
+        with FakeTime('2017-04-25 14:46:05'):
             assert timer_script.is_backup_necessary(backup_path, '--workday')
             assert not timer_script.is_backup_necessary(backup_path, '--holiday')
-
-            timer_script.CURRENT_DATETIME = datetime.datetime.strptime('2017-04-22 14:46:05', '%Y-%m-%d %H:%M:%S')
+        with FakeTime('2017-04-22 14:46:05'):
             assert not timer_script.is_backup_necessary(backup_path, '--workday')
             assert timer_script.is_backup_necessary(backup_path, '--holiday')
-
-            timer_script.CURRENT_DATETIME = datetime.datetime.strptime('2017-04-23 14:46:05', '%Y-%m-%d %H:%M:%S')
+        with FakeTime('2017-04-23 14:46:05'):
             assert not timer_script.is_backup_necessary(backup_path, '--workday')
             assert timer_script.is_backup_necessary(backup_path, '--holiday')
-        finally:
-            timer_script.CURRENT_DATETIME = saved_datetime
 
     def test_age_exceeds(self):
         backup_path = get_backup_path('20h')
