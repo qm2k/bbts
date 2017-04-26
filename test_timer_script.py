@@ -28,6 +28,15 @@ class FakeTime(object):
         timer_script.CURRENT_DATETIME = self.saved_datetime
 
 
+class RemoteAddress(object):
+    def __init__(self, remote_address):
+        self.remote_address = remote_address
+    def __enter__(self):
+        os.environ['REMOTE_ADDR'] = self.remote_address
+    def __exit__(self, type, value, traceback):
+        del os.environ['REMOTE_ADDR']
+
+
 class Test_parse_burp_duration(unittest.TestCase):
 
     def test_constant(self):
@@ -121,25 +130,22 @@ class Test_is_backup_necessary(unittest.TestCase):
 
     def test_lan(self):
         backup_path = get_backup_path()
-
-        os.environ['REMOTE_ADDR'] = '10.10.10.10'
-        assert timer_script.is_backup_necessary(backup_path, '--lan')
-        assert not timer_script.is_backup_necessary(backup_path, '--not-lan')
-
-        os.environ['REMOTE_ADDR'] = '8.8.8.8'
-        assert not timer_script.is_backup_necessary(backup_path, '--lan')
-        assert timer_script.is_backup_necessary(backup_path, '--not-lan')
+        with RemoteAddress('10.10.10.10'):
+            assert timer_script.is_backup_necessary(backup_path, '--lan')
+            assert not timer_script.is_backup_necessary(backup_path, '--not-lan')
+        with RemoteAddress('8.8.8.8'):
+            assert not timer_script.is_backup_necessary(backup_path, '--lan')
+            assert timer_script.is_backup_necessary(backup_path, '--not-lan')
 
     def test_subnet(self):
         backup_path = get_backup_path()
-
-        os.environ['REMOTE_ADDR'] = '10.1.1.1'
-        assert timer_script.is_backup_necessary(backup_path, '--subnet 10.1.1.0/24')
-        assert timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.1.1.0/24')
-        assert not timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.2.2.0/24')
-        assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24')
-        assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.2.2.0/24')
-        assert not timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.1.1.0/24')
+        with RemoteAddress('10.1.1.1'):
+            assert timer_script.is_backup_necessary(backup_path, '--subnet 10.1.1.0/24')
+            assert timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.1.1.0/24')
+            assert not timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.2.2.0/24')
+            assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24')
+            assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.2.2.0/24')
+            assert not timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.1.1.0/24')
 
     def test_weekday(self):
         backup_path = get_backup_path()
@@ -181,17 +187,16 @@ class Test_is_backup_necessary(unittest.TestCase):
 
     def test_binary_operations(self):
         backup_path = get_backup_path('20h')
-        os.environ['REMOTE_ADDR'] = '10.10.10.10'
+        with RemoteAddress('10.10.10.10'):
+            assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h --lan')
+            assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h --not-lan')
+            assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h --lan')
+            assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h --not-lan')
 
-        assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h --lan')
-        assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h --not-lan')
-        assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h --lan')
-        assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h --not-lan')
-
-        assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h', '--lan')
-        assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h', '--not-lan')
-        assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h', '--lan')
-        assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h', '--not-lan')
+            assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h', '--lan')
+            assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 19h', '--not-lan')
+            assert timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h', '--lan')
+            assert not timer_script.is_backup_necessary(backup_path, '--age-exceeds 21h', '--not-lan')
 
 
 if __name__ == '__main__':
