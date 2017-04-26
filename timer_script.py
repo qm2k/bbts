@@ -86,6 +86,9 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
     def remote_address_is_private():
         return remote_address().is_private
 
+    def remote_address_in_subnet(subnet_string):
+        return remote_address() in ipaddress.ip_network(subnet_string)
+
     def weekday():
         return CURRENT_DATETIME.weekday()
 
@@ -125,6 +128,8 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
     conditions = (
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
+        Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
+        Condition(name = 'not_subnet', argument_action = 'append', call = negation(disjunction(remote_address_in_subnet))),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),

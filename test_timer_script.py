@@ -129,6 +129,17 @@ class Test_is_backup_necessary(unittest.TestCase):
         assert not timer_script.is_backup_necessary(backup_path, '--lan')
         assert timer_script.is_backup_necessary(backup_path, '--not-lan')
 
+    def test_subnet(self):
+        backup_path = get_backup_path()
+
+        os.environ['REMOTE_ADDR'] = '10.1.1.1'
+        assert timer_script.is_backup_necessary(backup_path, '--subnet 10.1.1.0/24')
+        assert timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.1.1.0/24')
+        assert not timer_script.is_backup_necessary(backup_path, '--subnet 10.0.0.0/24,10.2.2.0/24')
+        assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24')
+        assert timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.2.2.0/24')
+        assert not timer_script.is_backup_necessary(backup_path, '--not-subnet 10.0.0.0/24,10.1.1.0/24')
+
     def test_weekday(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-25 14:46:05'):
