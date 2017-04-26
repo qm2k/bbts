@@ -54,21 +54,28 @@ def parse_time_of_day_interval(text,
         end = parse_time_of_day(match.group('end')))
 
 
+def is_backup_new(backup_path):
+    return not os.path.exists(backup_path)
+
+
 def is_backup_continued(backup_path,
     __interrupted_backup_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
 ):
-    if os.path.exists(backup_path):
-        log_filename = os.path.join(backup_path, 'log.gz')
-        with gzip.open(log_filename, 'rt') as log_file:
-            for line in log_file:
-                if __interrupted_backup_regex.fullmatch(line):
-                    return True
+    if is_backup_new(backup_path):
+        return False
+
+    log_filename = os.path.join(backup_path, 'log.gz')
+    with gzip.open(log_filename, 'rt') as log_file:
+        for line in log_file:
+            if __interrupted_backup_regex.fullmatch(line):
+                return True
+
     return False
 
 
-def get_backup_timestamp(backup_path):
-    if not os.path.exists(backup_path):
-        return datetime.datetime(1, 1, 1)
+def get_backup_timestamp(backup_path, __new_timestamp = datetime.datetime(1, 1, 1)):
+    if is_backup_new(backup_path):
+        return __new_timestamp
 
     timestamp_filename = os.path.join(backup_path, 'timestamp')
     with open(timestamp_filename, 'rt') as timestamp_file:
