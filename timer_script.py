@@ -20,13 +20,18 @@ import subprocess
 CURRENT_DATETIME = datetime.datetime.now()
 
 
-def parse_burp_duration(duration_string,
+def match_full(regex, text):
+    match = regex.fullmatch(text)
+    if not match:
+        raise ValueError(text, regex.pattern)
+    return match
+
+
+def parse_burp_duration(text,
     __regex = re.compile('(?P<number>\d+)(?P<unit>[smhdwn])'),
     __unit_to_seconds = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 7*86400, 'n': 30*86400}
 ):
-    match = __regex.fullmatch(duration_string)
-    if not match:
-        raise ValueError(duration_string)
+    match = match_full(__regex, text)
     return datetime.timedelta(seconds = int(match.group('number')) * __unit_to_seconds[match.group('unit')])
 
 
