@@ -83,29 +83,52 @@ def match_argument_strings(latest_path, *argument_strings, verbose = False):
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
 
+    def remote_address_is_private():
+        return remote_address().is_private
+
     def weekday():
         return CURRENT_DATETIME.weekday()
 
     def age_exceeds(maximum_age_string):
         return CURRENT_DATETIME > get_backup_timestamp(latest_path) + parse_burp_duration(maximum_age_string)
 
-    def current_time_within(interval_strings):
+    def current_time_in(interval_string):
         current_time_of_day = CURRENT_DATETIME - datetime.datetime.combine(CURRENT_DATETIME.date(), datetime.time())
-        interval_strings = ','.join(interval_strings).split(',')
-        for interval_string in interval_strings:
-            interval = parse_time_of_day_interval(interval_string)
-            if interval.start <= current_time_of_day < interval.end:
-                verbose and print('Matched interval: {}', interval)
-                return True
-        return False
+        interval = parse_time_of_day_interval(interval_string)
+        return interval.start <= current_time_of_day < interval.end
+
+    def negation(condition):
+        def result(*args, **kwargs):
+            return not condition(*args, **kwargs)
+        return result
+
+    def conjunction(condition):
+        def result(value_strings):
+            value_strings = ','.join(value_strings).split(',')
+            for value_string in value_strings:
+                if condition(value_string):
+                    verbose and print('Matched item: {}', value_string)
+                    return True
+            return False
+        return result
+
+    def disjunction(condition):
+        def result(value_strings):
+            value_strings = ','.join(value_strings).split(',')
+            for value_string in value_strings:
+                if condition(value_string):
+                    verbose and print('Matched item: {}', value_string)
+                    return True
+            return False
+        return result
 
     conditions = (
-        Condition(name = 'lan', argument_action = 'store_true', call = lambda: remote_address().is_private),
-        Condition(name = 'not_lan', argument_action = 'store_true', call = lambda: not remote_address().is_private),
+        Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
+        Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
-        Condition(name = 'current_time', argument_action = 'append', call = current_time_within),
+        Condition(name = 'current_time', argument_action = 'append', call = disjunction(current_time_in)),
     )
 
     parser = argparse.ArgumentParser()
