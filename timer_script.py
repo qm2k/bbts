@@ -61,15 +61,6 @@ Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'cal
 
 def match_argument_strings(latest_path, *argument_strings):
 
-    def match_hours_ranges(hours_ranges):
-        for hours_range in hours_ranges:
-            first_hour, last_hour = hours_range.split('..')
-            first_hour = int(first_hour) if first_hour else 0
-            last_hour = int(last_hour) if last_hour else 24
-            if first_hour <= CURRENT_DATETIME.hour <= last_hour:
-                return True
-        return False
-
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
 
