@@ -57,16 +57,19 @@ def parse_time_of_day_interval(text,
 def is_backup_continued(backup_path,
     __interrupted_backup_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
 ):
-    log_filename = os.path.join(backup_path, 'log.gz')
-    with gzip.open(log_filename, 'rt') as log_file:
-        for line in log_file:
-            if __interrupted_backup_regex.fullmatch(line):
-                return True
-
+    if os.path.exists(backup_path):
+        log_filename = os.path.join(backup_path, 'log.gz')
+        with gzip.open(log_filename, 'rt') as log_file:
+            for line in log_file:
+                if __interrupted_backup_regex.fullmatch(line):
+                    return True
     return False
 
 
 def get_backup_timestamp(backup_path):
+    if not os.path.exists(backup_path):
+        return datetime.datetime(1, 1, 1)
+
     timestamp_filename = os.path.join(backup_path, 'timestamp')
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
@@ -163,13 +166,6 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     return False
 
 
-def is_backup_necessary(prior_path, *argument_strings, verbose = False):
-    if not os.path.exists(prior_path):
-        return True
-
-    return check_conditions(prior_path, *argument_strings, verbose = verbose)
-
-
 def main(arguments):
     '''Main function.'''
     if len(arguments) < 7 or '--help' in arguments:
@@ -177,8 +173,8 @@ def main(arguments):
         return os.EX_USAGE
     client_name, prior_path, data_path = arguments[1:4]
     argument_strings = arguments[6:]
-
-    return os.EX_OK if is_backup_necessary(prior_path, *argument_strings, verbose = True) else not os.EX_OK
+    conditions_check = check_conditions(prior_path, *argument_strings, verbose = True)
+    return {True: os.EX_OK, False: not os.EX_OK}[conditions_check]
 
 
 if __name__ == "__main__":

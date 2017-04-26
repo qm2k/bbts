@@ -126,7 +126,13 @@ class Test_check_conditions(unittest.TestCase):
         assert not timer_script.check_conditions(get_backup_path('onepiece'))
 
     def test_new_backup(self):
-        assert timer_script.check_conditions(get_backup_path('empty'))
+        backup_path = get_backup_path('empty')
+        assert not timer_script.check_conditions(backup_path)
+        assert timer_script.check_conditions(backup_path, '--age-exceeds 20h')
+        assert not timer_script.check_conditions(backup_path, '--continued')
+        with RemoteAddress('8.8.8.8'):
+            assert timer_script.check_conditions(backup_path, '--not-lan')
+            assert not timer_script.check_conditions(backup_path, '--lan')
 
     def test_lan(self):
         backup_path = get_backup_path()
