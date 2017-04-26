@@ -80,6 +80,9 @@ Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'cal
 
 def match_argument_strings(prior_path, *argument_strings, verbose = False):
 
+    def was_continued():
+        return is_backup_continued(prior_path)
+
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
 
@@ -126,6 +129,7 @@ def match_argument_strings(prior_path, *argument_strings, verbose = False):
         return result
 
     conditions = (
+        Condition(name = 'continued', argument_action = 'store_true', call = was_continued),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
         Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
@@ -161,9 +165,6 @@ def match_argument_strings(prior_path, *argument_strings, verbose = False):
 
 def is_backup_necessary(prior_path, *argument_strings, verbose = False):
     if not os.path.exists(prior_path):
-        return True
-
-    if is_backup_continued(prior_path):
         return True
 
     return match_argument_strings(prior_path, *argument_strings, verbose = verbose)

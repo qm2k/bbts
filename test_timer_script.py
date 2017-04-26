@@ -113,7 +113,8 @@ class Test_is_backup_necessary(unittest.TestCase):
         assert not timer_script.is_backup_necessary(get_backup_path())
 
     def test_continued(self):
-        assert timer_script.is_backup_necessary(get_backup_path('continued'))
+        assert timer_script.is_backup_necessary(get_backup_path('continued'), '--continued')
+        assert not timer_script.is_backup_necessary(get_backup_path('onepiece'))
 
     def test_new_backup(self):
         assert timer_script.is_backup_necessary(get_backup_path('empty'))
