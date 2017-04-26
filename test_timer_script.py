@@ -12,7 +12,6 @@ import unittest
 import datetime
 
 
-
 TEST_BACKUPS = os.path.join(os.path.dirname(__file__), '_test_data', 'backups')
 
 def get_backup_path(backup_name = 'default'):
