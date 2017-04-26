@@ -19,6 +19,8 @@ import subprocess
 
 CURRENT_DATETIME = datetime.datetime.now()
 
+CREATED_TIMESTAMP = None
+
 
 def match_full(regex, text):
     match = regex.fullmatch(text)
@@ -94,6 +96,16 @@ def get_backup_timestamp(backup_path, __new_timestamp = datetime.datetime(1, 1, 
     return read_timestamp(timestamp_filename)
 
 
+def set_created_timestamp(prior_path):
+    global CREATED_TIMESTAMP
+    created_timestamp_directory, _ = os.path.split(prior_path)
+    created_timestamp_filename = os.path.join(created_timestamp_directory, 'created_timestamp')
+    if not os.path.exists(created_timestamp_filename):
+        os.makedirs(created_timestamp_directory, exist_ok = True)
+        write_timestamp(created_timestamp_filename, CURRENT_DATETIME)
+    CREATED_TIMESTAMP = read_timestamp(created_timestamp_filename)
+
+
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
 
 
@@ -110,6 +122,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     def weekday():
         return CURRENT_DATETIME.weekday()
+
+    def init_exceeds(maximum_age_string):
+        return is_backup_new(prior_path) and CURRENT_DATETIME > CREATED_TIMESTAMP + parse_burp_duration(maximum_age_string)
 
     def age_exceeds(maximum_age_string):
         return CURRENT_DATETIME > get_backup_timestamp(prior_path) + parse_burp_duration(maximum_age_string)
@@ -146,6 +161,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     conditions = (
         Condition(name = 'new', argument_action = 'store_true', call = lambda: is_backup_new(prior_path)),
+        Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
         Condition(name = 'continued', argument_action = 'store_true', call = lambda: is_backup_continued(prior_path)),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
@@ -156,6 +172,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
         Condition(name = 'time', argument_action = 'append', call = disjunction(current_time_in)),
     )
+
+    if is_backup_new(prior_path):
+         set_created_timestamp(prior_path)
 
     parser = argparse.ArgumentParser()
     for condition in conditions:
@@ -186,6 +205,7 @@ def main(arguments):
         sys.stderr.write('Usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <argument_strings...>\n')
         return os.EX_USAGE
     client_name, prior_path, data_path = arguments[1:4]
+
     argument_strings = arguments[6:]
     conditions_check = check_conditions(prior_path, *argument_strings, verbose = True)
     return {True: os.EX_OK, False: not os.EX_OK}[conditions_check]

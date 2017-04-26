@@ -142,6 +142,27 @@ class Test_check_conditions(unittest.TestCase):
             assert timer_script.check_conditions(backup_path, '--not-lan')
             assert not timer_script.check_conditions(backup_path, '--lan')
 
+    def test_init_exceeds(self):
+        assert not timer_script.check_conditions(get_backup_path('20h'), '--init-exceeds 1h')
+
+        backup_path = get_backup_path('dynamic_presence')
+        if os.path.exists(backup_path):
+            os.rmdir(backup_path)
+        created_timestamp_filename = os.path.join(os.path.split(backup_path)[0], 'created_timestamp')
+        if os.path.exists(created_timestamp_filename):
+            os.remove(created_timestamp_filename)
+
+        assert not os.path.exists(created_timestamp_filename)
+        assert not timer_script.check_conditions(backup_path, '--init-exceeds 1h')
+
+        assert os.path.exists(created_timestamp_filename)
+        assert not timer_script.check_conditions(backup_path, '--init-exceeds 1h')
+
+        timestamp = datetime.datetime.now() - datetime.timedelta(hours = 20)
+        timer_script.write_timestamp(created_timestamp_filename, timestamp)
+        assert timer_script.check_conditions(backup_path, '--init-exceeds 19h')
+        assert not timer_script.check_conditions(backup_path, '--init-exceeds 21h')
+
     def test_lan(self):
         backup_path = get_backup_path()
         with RemoteAddress('10.10.10.10'):
