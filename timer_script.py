@@ -78,7 +78,7 @@ def get_backup_timestamp(backup_path):
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
 
 
-def match_argument_strings(prior_path, *argument_strings, verbose = False):
+def check_conditions(prior_path, *argument_strings, verbose = False):
 
     def was_continued():
         return is_backup_continued(prior_path)
@@ -167,7 +167,7 @@ def is_backup_necessary(prior_path, *argument_strings, verbose = False):
     if not os.path.exists(prior_path):
         return True
 
-    return match_argument_strings(prior_path, *argument_strings, verbose = verbose)
+    return check_conditions(prior_path, *argument_strings, verbose = verbose)
 
 
 def main(arguments):
