@@ -190,14 +190,21 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         nonlocal matched_date
         matched_date = CURRENT_DATETIME.date()
 
+        argument_found = False
         for condition in conditions:
             argument_value = arguments.get(condition.name, None)
             if argument_value in (None, False):
                 continue
+            argument_found = True
+
             condition_arguments = (argument_value,) if argument_value != True else ()
             if not condition.call(*condition_arguments):
                 verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
                 return False
+
+        if not argument_found:
+            raise ValueError('No arguments found.')
+
         return True
 
     for argument_string in argument_strings:
