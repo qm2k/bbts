@@ -133,6 +133,10 @@ class Test_check_conditions(unittest.TestCase):
         assert not timer_script.check_conditions(get_backup_path())
         assert not timer_script.check_conditions(get_backup_path('empty'))
 
+    def test_comment(self):
+        assert timer_script.check_conditions(get_backup_path('continued'), '--continued # this is another comment --lan')
+        assert not timer_script.check_conditions(get_backup_path('onepiece'), '--continued # this is another comment --lan')
+
     def test_continued(self):
         assert timer_script.check_conditions(get_backup_path('continued'), '--continued')
         assert not timer_script.check_conditions(get_backup_path('onepiece'))

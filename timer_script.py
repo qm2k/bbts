@@ -201,7 +201,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         return True
 
     for argument_string in argument_strings:
-        arguments = vars(parser.parse_args(shlex.split(argument_string)))
+        arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
         if match_conditions(arguments):
             verbose and print('Matched: {}'.format(argument_string))
             if arguments.get('stop', False):
