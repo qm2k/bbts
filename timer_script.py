@@ -139,16 +139,6 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
             return not condition(*args, **kwargs)
         return result
 
-    def conjunction(condition):
-        def result(value_strings):
-            value_strings = ','.join(value_strings).split(',')
-            for value_string in value_strings:
-                if condition(value_string):
-                    verbose and print('Matched item: {}', value_string)
-                    return True
-            return False
-        return result
-
     def disjunction(condition):
         def result(value_strings):
             value_strings = ','.join(value_strings).split(',')
