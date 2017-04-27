@@ -175,6 +175,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     parser = argparse.ArgumentParser()
     for condition in conditions:
+        assert '-' not in condition.name
         parser.add_argument('--' + condition.name.replace('_', '-'), action = condition.argument_action)
     parser.add_argument('--stop', action = 'store_true')
 
