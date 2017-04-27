@@ -215,14 +215,24 @@ class Test_check_conditions(unittest.TestCase):
             assert not timer_script.check_conditions(backup_path, '--time 37..38')
             assert not timer_script.check_conditions(backup_path, '--time 39..40')
 
+            assert timer_script.check_conditions(backup_path, '--time=-10..-9')
+            assert not timer_script.check_conditions(backup_path, '--time=-9..-8')
+            assert not timer_script.check_conditions(backup_path, '--time=-11..-10')
+
+            assert timer_script.check_conditions(backup_path, '--time 14..15,38..39 --workday')
+            assert not timer_script.check_conditions(backup_path, '--time 14..15,38..39 --holiday')
+            assert not timer_script.check_conditions(backup_path, '--time 38..39,14..15 --workday')
+            assert timer_script.check_conditions(backup_path, '--time 38..39,14..15 --holiday')
+
+            assert not timer_script.check_conditions(backup_path, '--time 13..14,38..39 --workday')
+            assert timer_script.check_conditions(backup_path, '--time 13..14,38..39 --holiday')
+            assert timer_script.check_conditions(backup_path, '--time 37..38,14..15 --workday')
+            assert not timer_script.check_conditions(backup_path, '--time 37..38,14..15 --holiday')
+
             assert timer_script.check_conditions(backup_path, '--time 14..15 --workday')
             assert not timer_script.check_conditions(backup_path, '--time 14..15 --holiday')
             assert not timer_script.check_conditions(backup_path, '--time 38..39 --workday')
             assert timer_script.check_conditions(backup_path, '--time 38..39 --holiday')
-
-            assert timer_script.check_conditions(backup_path, '--time=-10..-9')
-            assert not timer_script.check_conditions(backup_path, '--time=-9..-8')
-            assert not timer_script.check_conditions(backup_path, '--time=-11..-10')
 
     def test_current_time__multiple(self):
         backup_path = get_backup_path()
