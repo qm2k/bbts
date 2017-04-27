@@ -111,6 +111,9 @@ Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'cal
 
 def check_conditions(prior_path, *argument_strings, verbose = False):
 
+    def is_new():
+        return is_backup_new(prior_path)
+
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
 
@@ -150,7 +153,8 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         return result
 
     conditions = (
-        Condition(name = 'new', argument_action = 'store_true', call = lambda: is_backup_new(prior_path)),
+        Condition(name = 'new', argument_action = 'store_true', call = is_new),
+        Condition(name = 'not_new', argument_action = 'store_true', call = negation(is_new)),
         Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
         Condition(name = 'continued', argument_action = 'store_true', call = lambda: is_backup_continued(prior_path)),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
