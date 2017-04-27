@@ -204,12 +204,25 @@ class Test_check_conditions(unittest.TestCase):
 
     def test_current_time(self):
         backup_path = get_backup_path()
-        with FakeTime('2017-04-25 14:46:05'):
+        with FakeTime('2017-04-24 14:46:05'):
             assert timer_script.check_conditions(backup_path, '--time 14:46..14:47')
             assert timer_script.check_conditions(backup_path, '--time 14:46:05..14:46:06')
             assert not timer_script.check_conditions(backup_path, '--time 14:45..14:46')
             assert not timer_script.check_conditions(backup_path, '--time 14:45:04..14:46:05')
             assert not timer_script.check_conditions(backup_path, '--time 14:47..14:48')
+
+            assert timer_script.check_conditions(backup_path, '--time 38..39')
+            assert not timer_script.check_conditions(backup_path, '--time 37..38')
+            assert not timer_script.check_conditions(backup_path, '--time 39..40')
+
+            assert timer_script.check_conditions(backup_path, '--time 14..15 --workday')
+            assert not timer_script.check_conditions(backup_path, '--time 14..15 --holiday')
+            assert not timer_script.check_conditions(backup_path, '--time 38..39 --workday')
+            assert timer_script.check_conditions(backup_path, '--time 38..39 --holiday')
+
+            assert timer_script.check_conditions(backup_path, '--time=-10..-9')
+            assert not timer_script.check_conditions(backup_path, '--time=-9..-8')
+            assert not timer_script.check_conditions(backup_path, '--time=-11..-10')
 
     def test_current_time__multiple(self):
         backup_path = get_backup_path()

@@ -109,6 +109,8 @@ Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'cal
 
 def check_conditions(prior_path, *argument_strings, verbose = False):
 
+    matched_date = None
+
     def is_new():
         return is_backup_new(prior_path)
 
@@ -122,7 +124,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         return remote_address() in ipaddress.ip_network(subnet_string)
 
     def weekday():
-        return CURRENT_DATETIME.weekday()
+        return matched_date.weekday()
 
     def init_exceeds(maximum_age_string):
         return is_backup_new(prior_path) and CURRENT_DATETIME > CREATED_TIMESTAMP + parse_burp_duration(maximum_age_string)
@@ -130,10 +132,11 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     def age_exceeds(maximum_age_string):
         return CURRENT_DATETIME > get_backup_timestamp(prior_path) + parse_burp_duration(maximum_age_string)
 
-    def current_time_in(interval_string):
-        current_time_of_day = CURRENT_DATETIME - datetime.datetime.combine(CURRENT_DATETIME.date(), datetime.time())
+    def match_time(interval_string):
+        nonlocal matched_date
         interval = parse_time_of_day_interval(interval_string)
-        return interval.start <= current_time_of_day < interval.end
+        matched_date = (CURRENT_DATETIME - interval.start).date()
+        return CURRENT_DATETIME < datetime.datetime.combine(matched_date, datetime.time()) + interval.end
 
     def negation(condition):
         def result(*args, **kwargs):
@@ -153,16 +156,18 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     conditions = (
         Condition(name = 'new', argument_action = 'store_true', call = is_new),
         Condition(name = 'not_new', argument_action = 'store_true', call = negation(is_new)),
-        Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
         Condition(name = 'continued', argument_action = 'store_true', call = lambda: is_backup_continued(prior_path)),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
         Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
         Condition(name = 'not_subnet', argument_action = 'append', call = negation(disjunction(remote_address_in_subnet))),
+        # time condition must be processed before any day-related conditions
+        # because it may change matched_date
+        Condition(name = 'time', argument_action = 'append', call = disjunction(match_time)),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
+        Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
-        Condition(name = 'time', argument_action = 'append', call = disjunction(current_time_in)),
     )
 
     if is_backup_new(prior_path):
@@ -174,6 +179,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     parser.add_argument('--stop', action = 'store_true')
 
     def match_conditions(arguments):
+        nonlocal matched_date
+        matched_date = CURRENT_DATETIME.date()
+
         for condition in conditions:
             argument_value = arguments.get(condition.name, None)
             if argument_value in (None, False):
