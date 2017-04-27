@@ -238,6 +238,24 @@ class Test_check_conditions(unittest.TestCase):
             assert timer_script.check_conditions(backup_path, '--age-exceeds 21h', '--lan')
             assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h', '--not-lan')
 
+    def test_stop(self):
+        backup_path = get_backup_path('20h')
+        with RemoteAddress('10.10.10.10'):
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 19h --lan --stop')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 19h --not-lan --stop')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h --lan --stop')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h --not-lan --stop')
+
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 19h --stop', '--lan')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 19h --stop', '--not-lan')
+            assert timer_script.check_conditions(backup_path, '--age-exceeds 21h --stop', '--lan')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h --stop', '--not-lan')
+
+            assert timer_script.check_conditions(backup_path, '--age-exceeds 19h', '--lan --stop')
+            assert timer_script.check_conditions(backup_path, '--age-exceeds 19h', '--not-lan --stop')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h', '--lan --stop')
+            assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h', '--not-lan --stop')
+
 
 if __name__ == '__main__':
     unittest.main()

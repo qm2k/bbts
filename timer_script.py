@@ -173,6 +173,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     parser = argparse.ArgumentParser()
     for condition in conditions:
         parser.add_argument('--' + condition.name.replace('_', '-'), action = condition.argument_action)
+    parser.add_argument('--stop', action = 'store_true')
 
     def match_conditions(arguments):
         for condition in conditions:
@@ -186,8 +187,11 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         return True
 
     for argument_string in argument_strings:
-        if match_conditions(vars(parser.parse_args(shlex.split(argument_string)))):
+        arguments = vars(parser.parse_args(shlex.split(argument_string)))
+        if match_conditions(arguments):
             verbose and print('Matched: {}'.format(argument_string))
+            if arguments.get('stop', False):
+                return False
             return True
 
     return False
