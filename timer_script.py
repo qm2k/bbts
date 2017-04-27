@@ -48,12 +48,10 @@ def parse_time_of_day(text,
 Interval = collections.namedtuple('Interval', ('start', 'end'))
 
 def parse_time_of_day_interval(text,
-    __regex = re.compile('(?P<start>[0-9:T +-]*[0-9T ])(/|--)(?P<end>[0-9:T +-]+)')
+    __regex = re.compile('(?P<start>[0-9:T +-]+)\\.\\.(?P<end>[0-9:T +-]+)')
 ):
     match = match_full(__regex, text)
-    return Interval(
-        start = parse_time_of_day(match.group('start')),
-        end = parse_time_of_day(match.group('end')))
+    return Interval(*map(parse_time_of_day, match.groups()))
 
 
 def is_backup_new(backup_path):

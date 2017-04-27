@@ -84,15 +84,13 @@ class Test_parse_time_of_day_interval(unittest.TestCase):
         expected_result = timer_script.Interval(
             start = datetime.timedelta(days = 1, hours = 2, minutes = 3),
             end = datetime.timedelta(days = 4, hours = 5, minutes = 6))
-        assert timer_script.parse_time_of_day_interval('1T2:3/4T5:6') == expected_result
-        assert timer_script.parse_time_of_day_interval('1T2:3--4T5:6') == expected_result
+        assert timer_script.parse_time_of_day_interval('1T2:3..4T5:6') == expected_result
 
     def test_negative(self):
         expected_result = timer_script.Interval(
             start = datetime.timedelta(days = -1, hours = 2, minutes = 3),
             end = datetime.timedelta(days = -4, hours = 5, minutes = 6))
-        assert timer_script.parse_time_of_day_interval('-1T2:3/-4T5:6') == expected_result
-        assert timer_script.parse_time_of_day_interval('-1T2:3---4T5:6') == expected_result
+        assert timer_script.parse_time_of_day_interval('-1T2:3..-4T5:6') == expected_result
 
 
 class Test_is_backup_continued(unittest.TestCase):
@@ -207,23 +205,23 @@ class Test_check_conditions(unittest.TestCase):
     def test_current_time(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-25 14:46:05'):
-            assert timer_script.check_conditions(backup_path, '--time 14:46--14:47')
-            assert timer_script.check_conditions(backup_path, '--time 14:46:05--14:46:06')
-            assert not timer_script.check_conditions(backup_path, '--time 14:45--14:46')
-            assert not timer_script.check_conditions(backup_path, '--time 14:45:04--14:46:05')
-            assert not timer_script.check_conditions(backup_path, '--time 14:47--14:48')
+            assert timer_script.check_conditions(backup_path, '--time 14:46..14:47')
+            assert timer_script.check_conditions(backup_path, '--time 14:46:05..14:46:06')
+            assert not timer_script.check_conditions(backup_path, '--time 14:45..14:46')
+            assert not timer_script.check_conditions(backup_path, '--time 14:45:04..14:46:05')
+            assert not timer_script.check_conditions(backup_path, '--time 14:47..14:48')
 
     def test_current_time__multiple(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-25 14:46:05'):
-            assert timer_script.check_conditions(backup_path, '--time 13--14,14--15,16--17')
-            assert timer_script.check_conditions(backup_path, '--time 13--14', '--time 16--17,14--15')
-            assert timer_script.check_conditions(backup_path, '--time 13--14,14--15', '--time 16--17')
-            assert timer_script.check_conditions(backup_path, '--time 13--14', '--time 14--15', '--time 16--17')
-            assert not timer_script.check_conditions(backup_path, '--time 13--14,15--16,16--17')
-            assert not timer_script.check_conditions(backup_path, '--time 13--14', '--time 16--17,15--16')
-            assert not timer_script.check_conditions(backup_path, '--time 13--14,15--16', '--time 16--17')
-            assert not timer_script.check_conditions(backup_path, '--time 13--14', '--time 15--16', '--time 16--17')
+            assert timer_script.check_conditions(backup_path, '--time 13..14,14..15,16..17')
+            assert timer_script.check_conditions(backup_path, '--time 13..14', '--time 16..17,14..15')
+            assert timer_script.check_conditions(backup_path, '--time 13..14,14..15', '--time 16..17')
+            assert timer_script.check_conditions(backup_path, '--time 13..14', '--time 14..15', '--time 16..17')
+            assert not timer_script.check_conditions(backup_path, '--time 13..14,15..16,16..17')
+            assert not timer_script.check_conditions(backup_path, '--time 13..14', '--time 16..17,15..16')
+            assert not timer_script.check_conditions(backup_path, '--time 13..14,15..16', '--time 16..17')
+            assert not timer_script.check_conditions(backup_path, '--time 13..14', '--time 15..16', '--time 16..17')
 
     def test_binary_operations(self):
         backup_path = get_backup_path('20h')
