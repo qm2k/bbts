@@ -5,4 +5,5 @@ __pycache__/
 _test_data/backups/20h/current/timestamp
 _test_data/backups/dynamic_presence/created_timestamp
 _test_data/backups/dynamic_timestamp/current/timestamp
+_test_data/backups/yesterday9/current/timestamp
 

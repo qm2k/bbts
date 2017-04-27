@@ -111,6 +111,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     matched_date = None
 
+    def matched_datetime(time_of_day):
+        return datetime.datetime.combine(matched_date, datetime.time()) + time_of_day
+
     def is_new():
         return is_backup_new(prior_path)
 
@@ -132,11 +135,14 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     def age_exceeds(maximum_age_string):
         return CURRENT_DATETIME > get_backup_timestamp(prior_path) + parse_burp_duration(maximum_age_string)
 
+    def prior_before(time_of_day_string):
+        return matched_datetime(parse_time_of_day(time_of_day_string)) > get_backup_timestamp(prior_path)
+
     def match_time(interval_string):
         nonlocal matched_date
         interval = parse_time_of_day_interval(interval_string)
         matched_date = (CURRENT_DATETIME - interval.start).date()
-        return CURRENT_DATETIME < datetime.datetime.combine(matched_date, datetime.time()) + interval.end
+        return CURRENT_DATETIME < matched_datetime(interval.end)
 
     def negation(condition):
         def result(*args, **kwargs):
@@ -168,6 +174,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
         Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
         Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
+        Condition(name = 'prior_before', argument_action = 'store', call = prior_before),
     )
 
     if is_backup_new(prior_path):

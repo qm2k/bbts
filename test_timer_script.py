@@ -123,6 +123,12 @@ class Test_check_conditions(unittest.TestCase):
         timestamp = datetime.datetime.now() - datetime.timedelta(hours = 20)
         timer_script.write_timestamp(filename, timestamp)
 
+        filename = os.path.join(get_backup_path('yesterday9'), 'timestamp')
+        timestamp = datetime.datetime.combine(
+            datetime.datetime.now().date() - datetime.timedelta(days = 1),
+            datetime.time(hour = 9))
+        timer_script.write_timestamp(filename, timestamp)
+
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())
         assert not timer_script.check_conditions(get_backup_path('empty'))
@@ -201,6 +207,23 @@ class Test_check_conditions(unittest.TestCase):
         backup_path = get_backup_path('20h')
         assert timer_script.check_conditions(backup_path, '--age-exceeds 19h')
         assert not timer_script.check_conditions(backup_path, '--age-exceeds 21h')
+
+    def test_prior_before(self):
+        backup_path = get_backup_path('yesterday9')
+        assert timer_script.check_conditions(backup_path, '--prior-before 9')
+        assert timer_script.check_conditions(backup_path, '--prior-before 8')
+        assert timer_script.check_conditions(backup_path, '--prior-before=-1T10')
+        assert not timer_script.check_conditions(backup_path, '--prior-before=-1T9')
+        assert not timer_script.check_conditions(backup_path, '--prior-before=-1T8')
+
+    def test_prior_before__and__time(self):
+        backup_path = get_backup_path('yesterday9')
+        assert timer_script.check_conditions(backup_path, '--prior-before=-1T10 --time 0..24')
+        assert not timer_script.check_conditions(backup_path, '--prior-before=-1T9 --time 0..24')
+        assert timer_script.check_conditions(backup_path, '--prior-before 10 --time 1T0..2T0')
+        assert not timer_script.check_conditions(backup_path, '--prior-before 9 --time 1T0..2T0')
+        assert timer_script.check_conditions(backup_path, '--time 1T0..2T0 --prior-before 10')
+        assert not timer_script.check_conditions(backup_path, '--time 1T0..2T0 --prior-before 9')
 
     def test_current_time(self):
         backup_path = get_backup_path()
