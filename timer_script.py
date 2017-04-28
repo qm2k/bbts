@@ -137,56 +137,56 @@ class Conditions(object):
         return result
 
     def __get_conditions(self):
-        Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'type', 'call', 'help'))
+        Condition = collections.namedtuple('Condition', ('name', 'type', 'call', 'help'))
         return (
-            Condition(name = 'new', argument_action = 'store_true', type = None,
+            Condition(name = 'new', type = bool,
                 call = self.prior_backup.is_new,
                 help = 'there is no prior backup'),
-            Condition(name = 'not_new', argument_action = 'store_true', type = None,
+            Condition(name = 'not_new', type = bool,
                 call = self.prior_backup.is_new,
                 help = 'there is at least one prior backup'),
-            Condition(name = 'continued', argument_action = 'store_true', type = None,
+            Condition(name = 'continued', type = bool,
                 call = self.prior_backup.is_continued,
                 help = 'prior backup was interrupted and continued'),
-            Condition(name = 'lan', argument_action = 'store_true', type = None,
+            Condition(name = 'lan', type = bool,
                 call = lambda: remote_address().is_private,
                 help = 'client ip address is private'),
-            Condition(name = 'not_lan', argument_action = 'store_true', type = None,
+            Condition(name = 'not_lan', type = bool,
                 call = lambda: remote_address().is_private,
                 help = 'client ip address is not private'),
-            Condition(name = 'subnet', argument_action = 'append', type = ipaddress.ip_network,
+            Condition(name = 'subnet', type = [ipaddress.ip_network],
                 call = lambda subnet: remote_address() in subnet,
                 help = 'client ip address belongs to any of specified subnet(s)'),
-            Condition(name = 'not_subnet', argument_action = 'append', type = ipaddress.ip_network,
+            Condition(name = 'not_subnet', type = [ipaddress.ip_network],
                 call = lambda subnet: remote_address() in subnet,
                 help = 'client ip address does not belong to any of specified subnet(s)'),
             # after and time conditions must be processed before any other 
             # day-related conditions because they may change matched_date
-            Condition(name = 'after', argument_action = 'store', type = parse_time_of_day,
+            Condition(name = 'after', type = parse_time_of_day,
                 call = self.match_date,
                 help = '; '.join((
                     'current day starts after specified time-of-day',
                     'affects --workday, --holiday, --prior-before',
                     'incompatible with --time'))),
-            Condition(name = 'time', argument_action = 'append', type = parse_time_of_day_interval,
+            Condition(name = 'time', type = [parse_time_of_day_interval],
                 call = self.match_time_interval,
                 help = '; '.join((
                     'current time belongs to any of specified intervals',
                     'affects --workday, --holiday, --prior-before for ranges outside 0..24',
                     'incompatible with --after'))),
-            Condition(name = 'workday', argument_action = 'store_true', type = None,
+            Condition(name = 'workday', type = bool,
                 call = lambda: self.weekday() < 5,
                 help = 'current day of week is not Saturday or Sunday'),
-            Condition(name = 'holiday', argument_action = 'store_true', type = None,
+            Condition(name = 'holiday', type = bool,
                 call = lambda: self.weekday() >= 5,
                 help = 'current day of week is Saturday or Sunday'),
-            Condition(name = 'init_exceeds', argument_action = 'store', type = parse_burp_duration,
+            Condition(name = 'init_exceeds', type = parse_burp_duration,
                 call = self.prior_backup.init_exceeds,
                 help = 'attempts to create initial backup took more than specified duration'),
-            Condition(name = 'age_exceeds', argument_action = 'store', type = parse_burp_duration,
+            Condition(name = 'age_exceeds', type = parse_burp_duration,
                 call = self.prior_backup.age_exceeds,
                 help = 'prior backup is older than specified duration (or there is no prior backup)'),
-            Condition(name = 'prior_before', argument_action = 'store', type = parse_time_of_day,
+            Condition(name = 'prior_before', type = parse_time_of_day,
                 call = self.prior_before,
                 help = 'prior backup was created before specified time-of-day'),
         )
@@ -202,7 +202,7 @@ class Conditions(object):
 
     def get_parser(self):
         metavars = {
-            None: None,
+            bool: None,
             ipaddress.ip_address: 'IP-ADDRESS',
             ipaddress.ip_network: 'IP-NETWORK',
             parse_time_of_day: 'TIME-OF-DAY',
@@ -212,12 +212,16 @@ class Conditions(object):
         parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
         for condition in self.conditions:
             assert '-' not in condition.name
-            metavar = metavars[condition.type]
-            if condition.argument_action == 'append':
-                metavar += ',...'
+            if isinstance(condition.type, list):
+                [inner_type] = condition.type
+                metavar = metavars[inner_type] + ',...'
+                action = 'append'
+            else:
+                metavar = metavars[condition.type]
+                action = 'store_true' if condition.type == bool else 'store'
             parser.add_argument(
                 '--' + condition.name.replace('_', '-'),
-                action = condition.argument_action,
+                action = action,
                 help = condition.help,
                 **{'metavar': metavar for _ in range(0, bool(metavar))})
         return parser
@@ -253,10 +257,11 @@ class Conditions(object):
             argument_found = True
 
             call_function = condition.call
-            if condition.type not in (str, None):
+            if isinstance(condition.type, list):
+                [inner_type] = condition.type
+                call_function = self.disjunction(convert_call(call_function, inner_type))
+            elif condition.type != bool:
                 call_function = convert_call(call_function, condition.type)
-            if condition.argument_action == 'append':
-                call_function = self.disjunction(call_function)
             if condition.name.startswith('not_'):
                 call_function = negation(call_function)
 
