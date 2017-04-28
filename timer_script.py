@@ -27,18 +27,19 @@ def match_full(regex, text):
     return match
 
 
+BURP_DURATION_REGEX = re.compile('(?P<number>\d+)(?P<unit>[smhdwn])')
+
 def parse_burp_duration(text,
-    __regex = re.compile('(?P<number>\d+)(?P<unit>[smhdwn])'),
     __unit_to_seconds = {'s': 1, 'm': 60, 'h': 3600, 'd': 86400, 'w': 7*86400, 'n': 30*86400}
 ):
-    match = match_full(__regex, text)
+    match = match_full(BURP_DURATION_REGEX, text)
     return datetime.timedelta(seconds = int(match.group('number')) * __unit_to_seconds[match.group('unit')])
 
 
-def parse_time_of_day(text,
-    __regex = re.compile('((?P<days>[+-]?\d+)[T ]|T?)(?P<hours>[+-]?\d+)(:(?P<minutes>[+-]?\d+)(:(?P<seconds>[+-]?\d+))?)?')
-):
-    match = match_full(__regex, text)
+TIME_OF_DAY_REGEX = re.compile('((?P<days>[+-]?\d+)[T ]|T?)(?P<hours>[+-]?\d+)(:(?P<minutes>[+-]?\d+)(:(?P<seconds>[+-]?\d+))?)?')
+
+def parse_time_of_day(text):
+    match = match_full(TIME_OF_DAY_REGEX, text)
     kwargs = {key: int(value) for key, value in match.groupdict().items() if value}
     return datetime.timedelta(**kwargs)
 
@@ -77,7 +78,7 @@ class Backup(object):
 
     def __init__(self, path):
         self.path = path
-        self.client_created = self.__get_client_created_timestamp() if self.is_new() else None
+        self.client_created = self.__get_client_created_timestamp() if self.path and self.is_new() else None
 
     def is_new(self):
         return not os.path.exists(self.path)
@@ -125,44 +126,69 @@ def remote_address():
 
 
 class Conditions(object):
-    def disjunction(self, condition, type = str):
+    def disjunction(self, condition):
         def result(value_strings):
             value_strings = ','.join(value_strings).split(',')
             for value_string in value_strings:
-                if condition(type(value_string)):
+                if condition(value_string):
                     self.verbose and print('Matched item: {}'.format(value_string))
                     return True
             return False
         return result
 
     def __get_conditions(self):
-        Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
-        lan_call = lambda: remote_address().is_private
-        subnet_call = self.disjunction(lambda subnet: remote_address() in subnet, ipaddress.ip_network)
+        Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'type', 'call', 'help'))
         return (
-            Condition(name = 'new', argument_action = 'store_true', call = self.prior_backup.is_new),
-            Condition(name = 'not_new', argument_action = 'store_true', call = negation(self.prior_backup.is_new)),
-            Condition(name = 'continued', argument_action = 'store_true', call = self.prior_backup.is_continued),
-            Condition(name = 'lan', argument_action = 'store_true', call = lan_call),
-            Condition(name = 'not_lan', argument_action = 'store_true', call = negation(lan_call)),
-            Condition(name = 'subnet', argument_action = 'append', call = subnet_call),
-            Condition(name = 'not_subnet', argument_action = 'append', call = negation(subnet_call)),
+            Condition(name = 'new', argument_action = 'store_true', type = None,
+                call = self.prior_backup.is_new,
+                help = 'there is no prior backup'),
+            Condition(name = 'not_new', argument_action = 'store_true', type = None,
+                call = self.prior_backup.is_new,
+                help = 'there is at least one prior backup'),
+            Condition(name = 'continued', argument_action = 'store_true', type = None,
+                call = self.prior_backup.is_continued,
+                help = 'prior backup was interrupted and continued'),
+            Condition(name = 'lan', argument_action = 'store_true', type = None,
+                call = lambda: remote_address().is_private,
+                help = 'client ip address is private'),
+            Condition(name = 'not_lan', argument_action = 'store_true', type = None,
+                call = lambda: remote_address().is_private,
+                help = 'client ip address is not private'),
+            Condition(name = 'subnet', argument_action = 'append', type = ipaddress.ip_network,
+                call = lambda subnet: remote_address() in subnet,
+                help = 'client ip address belongs to any of specified subnet(s)'),
+            Condition(name = 'not_subnet', argument_action = 'append', type = ipaddress.ip_network,
+                call = lambda subnet: remote_address() in subnet,
+                help = 'client ip address does not belong to any of specified subnet(s)'),
             # after and time conditions must be processed before any other 
             # day-related conditions because they may change matched_date
-            Condition(name = 'after', argument_action = 'store',
-                call = convert_call(self.match_date, parse_time_of_day)),
-            Condition(name = 'time', argument_action = 'append',
-                call = self.disjunction(self.match_time_interval, parse_time_of_day_interval)),
-            Condition(name = 'workday', argument_action = 'store_true',
-                call = lambda: self.weekday() < 5),
-            Condition(name = 'holiday', argument_action = 'store_true',
-                call = lambda: self.weekday() >= 5),
-            Condition(name = 'init_exceeds', argument_action = 'store',
-                call = convert_call(self.prior_backup.init_exceeds, parse_burp_duration)),
-            Condition(name = 'age_exceeds', argument_action = 'store',
-                call = convert_call(self.prior_backup.age_exceeds, parse_burp_duration)),
-            Condition(name = 'prior_before', argument_action = 'store',
-                call = convert_call(self.prior_before, parse_time_of_day)),
+            Condition(name = 'after', argument_action = 'store', type = parse_time_of_day,
+                call = self.match_date,
+                help = '; '.join((
+                    'current day starts after specified time-of-day',
+                    'affects --workday, --holiday, --prior-before',
+                    'incompatible with --time'))),
+            Condition(name = 'time', argument_action = 'append', type = parse_time_of_day_interval,
+                call = self.match_time_interval,
+                help = '; '.join((
+                    'current time belongs to any of specified intervals',
+                    'affects --workday, --holiday, --prior-before for ranges outside 0..24',
+                    'incompatible with --after'))),
+            Condition(name = 'workday', argument_action = 'store_true', type = None,
+                call = lambda: self.weekday() < 5,
+                help = 'current day of week is not Saturday or Sunday'),
+            Condition(name = 'holiday', argument_action = 'store_true', type = None,
+                call = lambda: self.weekday() >= 5,
+                help = 'current day of week is Saturday or Sunday'),
+            Condition(name = 'init_exceeds', argument_action = 'store', type = parse_burp_duration,
+                call = self.prior_backup.init_exceeds,
+                help = 'attempts to create initial backup took more than specified duration'),
+            Condition(name = 'age_exceeds', argument_action = 'store', type = parse_burp_duration,
+                call = self.prior_backup.age_exceeds,
+                help = 'prior backup is older than specified duration (or there is no prior backup)'),
+            Condition(name = 'prior_before', argument_action = 'store', type = parse_time_of_day,
+                call = self.prior_before,
+                help = 'prior backup was created before specified time-of-day'),
         )
 
     def reset(self):
@@ -175,10 +201,25 @@ class Conditions(object):
         self.reset()
 
     def get_parser(self):
-        parser = argparse.ArgumentParser()
+        metavars = {
+            None: None,
+            ipaddress.ip_address: 'IP-ADDRESS',
+            ipaddress.ip_network: 'IP-NETWORK',
+            parse_time_of_day: 'TIME-OF-DAY',
+            parse_time_of_day_interval: 'TIME-OF-DAY..TIME-OF-DAY',
+            parse_burp_duration: 'DURATION',
+        }
+        parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
         for condition in self.conditions:
             assert '-' not in condition.name
-            parser.add_argument('--' + condition.name.replace('_', '-'), action = condition.argument_action)
+            metavar = metavars[condition.type]
+            if condition.argument_action == 'append':
+                metavar += ',...'
+            parser.add_argument(
+                '--' + condition.name.replace('_', '-'),
+                action = condition.argument_action,
+                help = condition.help,
+                **{'metavar': metavar for _ in range(0, bool(metavar))})
         return parser
 
     def matched_datetime(self, time_of_day):
@@ -211,8 +252,16 @@ class Conditions(object):
                 continue
             argument_found = True
 
+            call_function = condition.call
+            if condition.type not in (str, None):
+                call_function = convert_call(call_function, condition.type)
+            if condition.argument_action == 'append':
+                call_function = self.disjunction(call_function)
+            if condition.name.startswith('not_'):
+                call_function = negation(call_function)
+
             call_arguments = (argument_value,) if argument_value != True else ()
-            if not condition.call(*call_arguments):
+            if not call_function(*call_arguments):
                 self.verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
                 return False
 
@@ -240,12 +289,23 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     return False
 
 
+def print_help():
+    print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...>\n')
+    Conditions(Backup(None)).get_parser().print_help()
+    print()
+    print('variable formats:')
+    print('  {:22}{}'.format('IP-NETWORK', 'See ipaddress.ip_network(...)'))
+    print('  {:22}{}'.format('TIME-OF-DAY', TIME_OF_DAY_REGEX.pattern))
+    print('  {:22}{}'.format('DURATION', BURP_DURATION_REGEX.pattern))
+
+
 def main(arguments):
     '''Main function.'''
     if len(arguments) < 7 or '--help' in arguments:
-        sys.stderr.write('Usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <argument_strings...>\n')
+        print_help()
         return os.EX_USAGE
     client_name, prior_path, data_path = arguments[1:4]
+    assert os.path.exists(data_path)
 
     argument_strings = arguments[6:]
     conditions_check = check_conditions(prior_path, *argument_strings, verbose = True)
