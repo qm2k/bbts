@@ -15,4 +15,4 @@ You can specify multiple conditions per line.
 All conditions on any `timer_arg` line must be met for backup to occur.
 Special `--stop` condition stops processing of further lines.
 
-Run script without parameters to see all supported conditions.
+See `examples` directory for configuration examples. Run script without parameters to see all supported conditions.
