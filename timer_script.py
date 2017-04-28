@@ -110,7 +110,42 @@ class Backup(object):
         return CURRENT_DATETIME > self.get_timestamp() + parse_burp_duration(maximum_age_string)
 
 
-class ConditionsArgumentsMatch(object):
+def negation(condition):
+    def result(*args, **kwargs):
+        return not condition(*args, **kwargs)
+    return result
+
+def remote_address():
+    return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
+
+def remote_address_is_private():
+    return remote_address().is_private
+
+def remote_address_in_subnet(subnet_string):
+    return remote_address() in ipaddress.ip_network(subnet_string)
+
+
+class Conditions(object):
+    def __get_conditions(self):
+        Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
+        return (
+            Condition(name = 'new', argument_action = 'store_true', call = self.prior_backup.is_new),
+            Condition(name = 'not_new', argument_action = 'store_true', call = negation(self.prior_backup.is_new)),
+            Condition(name = 'continued', argument_action = 'store_true', call = self.prior_backup.is_continued),
+            Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
+            Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
+            Condition(name = 'subnet', argument_action = 'append', call = self.disjunction(remote_address_in_subnet)),
+            Condition(name = 'not_subnet', argument_action = 'append', call = negation(self.disjunction(remote_address_in_subnet))),
+            # after and time conditions must be processed before any other 
+            # day-related conditions because they may change matched_date
+            Condition(name = 'after', argument_action = 'store', call = self.match_date),
+            Condition(name = 'time', argument_action = 'append', call = self.disjunction(self.match_time)),
+            Condition(name = 'workday', argument_action = 'store_true', call = lambda: self.weekday() < 5),
+            Condition(name = 'holiday', argument_action = 'store_true', call = lambda: self.weekday() >= 5),
+            Condition(name = 'init_exceeds', argument_action = 'store', call = self.prior_backup.init_exceeds),
+            Condition(name = 'age_exceeds', argument_action = 'store', call = self.prior_backup.age_exceeds),
+            Condition(name = 'prior_before', argument_action = 'store', call = self.prior_before),
+        )
 
     def reset(self):
         self.matched_date = CURRENT_DATETIME.date()
@@ -118,7 +153,15 @@ class ConditionsArgumentsMatch(object):
     def __init__(self, prior_backup, verbose = False):
         self.prior_backup = prior_backup
         self.verbose = verbose
+        self.conditions = self.__get_conditions()
         self.reset()
+
+    def get_parser(self):
+        parser = argparse.ArgumentParser()
+        for condition in self.conditions:
+            assert '-' not in condition.name
+            parser.add_argument('--' + condition.name.replace('_', '-'), action = condition.argument_action)
+        return parser
 
     def matched_datetime(self, time_of_day):
         return datetime.datetime.combine(self.matched_date, datetime.time()) + time_of_day
@@ -139,9 +182,7 @@ class ConditionsArgumentsMatch(object):
         return CURRENT_DATETIME < self.matched_datetime(interval.end)
 
     def negation(self, condition):
-        def result(*args, **kwargs):
-            return not condition(*args, **kwargs)
-        return result
+        return negation(condition)
 
     def disjunction(self, condition):
         def result(value_strings):
@@ -153,71 +194,22 @@ class ConditionsArgumentsMatch(object):
             return False
         return result
 
-
-def negation(condition):
-    def result(*args, **kwargs):
-        return not condition(*args, **kwargs)
-    return result
-
-def remote_address():
-    return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
-
-def remote_address_is_private():
-    return remote_address().is_private
-
-def remote_address_in_subnet(subnet_string):
-    return remote_address() in ipaddress.ip_network(subnet_string)
-
-
-Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
-
-
-def check_conditions(prior_path, *argument_strings, verbose = False):
-
-    prior_backup = Backup(prior_path)
-    condition_arguments_match = ConditionsArgumentsMatch(prior_backup, verbose)
-
-    conditions = (
-        Condition(name = 'new', argument_action = 'store_true', call = prior_backup.is_new),
-        Condition(name = 'not_new', argument_action = 'store_true', call = negation(prior_backup.is_new)),
-        Condition(name = 'continued', argument_action = 'store_true', call = prior_backup.is_continued),
-        Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
-        Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
-        Condition(name = 'subnet', argument_action = 'append', call = condition_arguments_match.disjunction(remote_address_in_subnet)),
-        Condition(name = 'not_subnet', argument_action = 'append', call = negation(condition_arguments_match.disjunction(remote_address_in_subnet))),
-        # after and time conditions must be processed before any other 
-        # day-related conditions because they may change matched_date
-        Condition(name = 'after', argument_action = 'store', call = condition_arguments_match.match_date),
-        Condition(name = 'time', argument_action = 'append', call = condition_arguments_match.disjunction(condition_arguments_match.match_time)),
-        Condition(name = 'workday', argument_action = 'store_true', call = lambda: condition_arguments_match.weekday() < 5),
-        Condition(name = 'holiday', argument_action = 'store_true', call = lambda: condition_arguments_match.weekday() >= 5),
-        Condition(name = 'init_exceeds', argument_action = 'store', call = prior_backup.init_exceeds),
-        Condition(name = 'age_exceeds', argument_action = 'store', call = prior_backup.age_exceeds),
-        Condition(name = 'prior_before', argument_action = 'store', call = condition_arguments_match.prior_before),
-    )
-
-    parser = argparse.ArgumentParser()
-    for condition in conditions:
-        assert '-' not in condition.name
-        parser.add_argument('--' + condition.name.replace('_', '-'), action = condition.argument_action)
-    parser.add_argument('--stop', action = 'store_true')
-
-    def match_conditions(arguments):
-        condition_arguments_match.reset()
+    def match(self, arguments):
+        self.reset()
 
         if arguments.get('after', None) and arguments.get('time', None):
             raise ValueError('Arguments --after and --time are not compatible.')
 
         argument_found = False
-        for condition in conditions:
+        for condition in self.conditions:
             argument_value = arguments.get(condition.name, None)
             if argument_value in (None, False):
                 continue
             argument_found = True
 
-            condition_arguments = (argument_value,) if argument_value != True else ()
-            if not condition.call(*condition_arguments):
-                verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
+            call_arguments = (argument_value,) if argument_value != True else ()
+            if not condition.call(*call_arguments):
+                self.verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
                 return False
 
         if not argument_found:
@@ -225,9 +217,17 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
         return True
 
+
+def check_conditions(prior_path, *argument_strings, verbose = False):
+
+    prior_backup = Backup(prior_path)
+    conditions = Conditions(prior_backup, verbose)
+    parser = conditions.get_parser()
+    parser.add_argument('--stop', action = 'store_true')
+
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
-        if match_conditions(arguments):
+        if conditions.match(arguments):
             verbose and print('Matched: {}'.format(argument_string))
             if arguments.get('stop', False):
                 return False
