@@ -138,6 +138,11 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     def prior_before(time_of_day_string):
         return matched_datetime(parse_time_of_day(time_of_day_string)) > get_backup_timestamp(prior_path)
 
+    def match_date(after_string):
+        nonlocal matched_date
+        matched_date = (CURRENT_DATETIME - parse_time_of_day(after_string)).date()
+        return True
+
     def match_time(interval_string):
         nonlocal matched_date
         interval = parse_time_of_day_interval(interval_string)
@@ -167,8 +172,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
         Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
         Condition(name = 'not_subnet', argument_action = 'append', call = negation(disjunction(remote_address_in_subnet))),
-        # time condition must be processed before any day-related conditions
-        # because it may change matched_date
+        # after and time conditions must be processed before any other 
+        # day-related conditions because they may change matched_date
+        Condition(name = 'after', argument_action = 'store', call = match_date),
         Condition(name = 'time', argument_action = 'append', call = disjunction(match_time)),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
@@ -189,6 +195,9 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     def match_conditions(arguments):
         nonlocal matched_date
         matched_date = CURRENT_DATETIME.date()
+
+        if arguments.get('after', None) and arguments.get('time', None):
+            raise ValueError('Arguments --after and --time are not compatible.')
 
         argument_found = False
         for condition in conditions:

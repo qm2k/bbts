@@ -230,6 +230,15 @@ class Test_check_conditions(unittest.TestCase):
         assert not timer_script.check_conditions(backup_path, '--prior-before=-1T9')
         assert not timer_script.check_conditions(backup_path, '--prior-before=-1T8')
 
+    def test_prior_before__and__after(self):
+        backup_path = get_backup_path('yesterday9')
+        assert timer_script.check_conditions(backup_path, '--prior-before=-1T10 --after 0')
+        assert not timer_script.check_conditions(backup_path, '--prior-before=-1T9 --after 0')
+        assert timer_script.check_conditions(backup_path, '--prior-before 10 --after 24')
+        assert not timer_script.check_conditions(backup_path, '--prior-before 9 --after 24')
+        assert timer_script.check_conditions(backup_path, '--after 24 --prior-before 10')
+        assert not timer_script.check_conditions(backup_path, '--after 24 --prior-before 9')
+
     def test_prior_before__and__time(self):
         backup_path = get_backup_path('yesterday9')
         assert timer_script.check_conditions(backup_path, '--prior-before=-1T10 --time 0..24')
@@ -239,7 +248,42 @@ class Test_check_conditions(unittest.TestCase):
         assert timer_script.check_conditions(backup_path, '--time 1T0..2T0 --prior-before 10')
         assert not timer_script.check_conditions(backup_path, '--time 1T0..2T0 --prior-before 9')
 
-    def test_current_time(self):
+    def test_after(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-24 14:46:05'):
+            assert timer_script.check_conditions(backup_path, '--after 14:46')
+            assert timer_script.check_conditions(backup_path, '--after 14:46:05')
+            assert timer_script.check_conditions(backup_path, '--after 14:45')
+            assert timer_script.check_conditions(backup_path, '--after 14:45:04')
+            assert timer_script.check_conditions(backup_path, '--after 14:47')
+
+            assert timer_script.check_conditions(backup_path, '--after 38')
+            assert timer_script.check_conditions(backup_path, '--after 37')
+            assert timer_script.check_conditions(backup_path, '--after 39')
+
+            assert timer_script.check_conditions(backup_path, '--after=-10')
+            assert timer_script.check_conditions(backup_path, '--after=-9')
+            assert timer_script.check_conditions(backup_path, '--after=-11')
+
+    def test_after__and__time(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-24 14:46:05'):
+            with self.assertRaises(ValueError):
+                timer_script.check_conditions(backup_path, '--after 14:46 --time 14:45..14:46')
+            with self.assertRaises(ValueError):
+                timer_script.check_conditions(backup_path, '--after 14:46 --time 14:46..14:47')
+            with self.assertRaises(ValueError):
+                timer_script.check_conditions(backup_path, '--after 14:46 --time 14:47..14:48')
+
+    def test_weekday__and__after(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-24 14:46:05'):
+            assert timer_script.check_conditions(backup_path, '--after 14 --workday')
+            assert not timer_script.check_conditions(backup_path, '--after 14 --holiday')
+            assert not timer_script.check_conditions(backup_path, '--after 38 --workday')
+            assert timer_script.check_conditions(backup_path, '--after 38 --holiday')
+
+    def test_time(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-24 14:46:05'):
             assert timer_script.check_conditions(backup_path, '--time 14:46..14:47')
