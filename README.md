@@ -13,6 +13,6 @@ Then specify necessary backup conditions in `timer_arg` lines, e.g.:
 
 You can specify multiple conditions per line.
 All conditions on any `timer_arg` line must be met for backup to occur.
-Special `--stop` condition stop processing of further lines.
+Special `--stop` condition stops processing of further lines.
 
 Run script without parameters to see all supported conditions.
