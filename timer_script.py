@@ -103,11 +103,11 @@ class Backup(object):
         timestamp_filename = os.path.join(self.path, 'timestamp')
         return read_timestamp(timestamp_filename)
 
-    def init_exceeds(self, maximum_age_string):
-        return self.is_new() and CURRENT_DATETIME > self.client_created + parse_burp_duration(maximum_age_string)
+    def init_exceeds(self, maximum_age):
+        return self.is_new() and CURRENT_DATETIME > self.client_created + maximum_age
 
-    def age_exceeds(self, maximum_age_string):
-        return CURRENT_DATETIME > self.get_timestamp() + parse_burp_duration(maximum_age_string)
+    def age_exceeds(self, maximum_age):
+        return CURRENT_DATETIME > self.get_timestamp() + maximum_age
 
 
 def negation(condition):
@@ -115,36 +115,54 @@ def negation(condition):
         return not condition(*args, **kwargs)
     return result
 
+def convert_call(condition, type):
+    def result(argument):
+        return condition(type(argument))
+    return result
+
 def remote_address():
     return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
 
-def remote_address_is_private():
-    return remote_address().is_private
-
-def remote_address_in_subnet(subnet_string):
-    return remote_address() in ipaddress.ip_network(subnet_string)
-
 
 class Conditions(object):
+    def disjunction(self, condition, type = str):
+        def result(value_strings):
+            value_strings = ','.join(value_strings).split(',')
+            for value_string in value_strings:
+                if condition(type(value_string)):
+                    self.verbose and print('Matched item: {}'.format(value_string))
+                    return True
+            return False
+        return result
+
     def __get_conditions(self):
         Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
+        lan_call = lambda: remote_address().is_private
+        subnet_call = self.disjunction(lambda subnet: remote_address() in subnet, ipaddress.ip_network)
         return (
             Condition(name = 'new', argument_action = 'store_true', call = self.prior_backup.is_new),
             Condition(name = 'not_new', argument_action = 'store_true', call = negation(self.prior_backup.is_new)),
             Condition(name = 'continued', argument_action = 'store_true', call = self.prior_backup.is_continued),
-            Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
-            Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
-            Condition(name = 'subnet', argument_action = 'append', call = self.disjunction(remote_address_in_subnet)),
-            Condition(name = 'not_subnet', argument_action = 'append', call = negation(self.disjunction(remote_address_in_subnet))),
+            Condition(name = 'lan', argument_action = 'store_true', call = lan_call),
+            Condition(name = 'not_lan', argument_action = 'store_true', call = negation(lan_call)),
+            Condition(name = 'subnet', argument_action = 'append', call = subnet_call),
+            Condition(name = 'not_subnet', argument_action = 'append', call = negation(subnet_call)),
             # after and time conditions must be processed before any other 
             # day-related conditions because they may change matched_date
-            Condition(name = 'after', argument_action = 'store', call = self.match_date),
-            Condition(name = 'time', argument_action = 'append', call = self.disjunction(self.match_time)),
-            Condition(name = 'workday', argument_action = 'store_true', call = lambda: self.weekday() < 5),
-            Condition(name = 'holiday', argument_action = 'store_true', call = lambda: self.weekday() >= 5),
-            Condition(name = 'init_exceeds', argument_action = 'store', call = self.prior_backup.init_exceeds),
-            Condition(name = 'age_exceeds', argument_action = 'store', call = self.prior_backup.age_exceeds),
-            Condition(name = 'prior_before', argument_action = 'store', call = self.prior_before),
+            Condition(name = 'after', argument_action = 'store',
+                call = convert_call(self.match_date, parse_time_of_day)),
+            Condition(name = 'time', argument_action = 'append',
+                call = self.disjunction(self.match_time_interval, parse_time_of_day_interval)),
+            Condition(name = 'workday', argument_action = 'store_true',
+                call = lambda: self.weekday() < 5),
+            Condition(name = 'holiday', argument_action = 'store_true',
+                call = lambda: self.weekday() >= 5),
+            Condition(name = 'init_exceeds', argument_action = 'store',
+                call = convert_call(self.prior_backup.init_exceeds, parse_burp_duration)),
+            Condition(name = 'age_exceeds', argument_action = 'store',
+                call = convert_call(self.prior_backup.age_exceeds, parse_burp_duration)),
+            Condition(name = 'prior_before', argument_action = 'store',
+                call = convert_call(self.prior_before, parse_time_of_day)),
         )
 
     def reset(self):
@@ -169,30 +187,16 @@ class Conditions(object):
     def weekday(self):
         return self.matched_date.weekday()
 
-    def prior_before(self, time_of_day_string):
-        return self.matched_datetime(parse_time_of_day(time_of_day_string)) > self.prior_backup.get_timestamp()
+    def prior_before(self, time_of_day):
+        return self.matched_datetime(time_of_day) > self.prior_backup.get_timestamp()
 
-    def match_date(self, after_string):
-        self.matched_date = (CURRENT_DATETIME - parse_time_of_day(after_string)).date()
+    def match_date(self, time_of_day):
+        self.matched_date = (CURRENT_DATETIME - time_of_day).date()
         return True
 
-    def match_time(self, interval_string):
-        interval = parse_time_of_day_interval(interval_string)
-        self.matched_date = (CURRENT_DATETIME - interval.start).date()
+    def match_time_interval(self, interval):
+        self.match_date(interval.start)
         return CURRENT_DATETIME < self.matched_datetime(interval.end)
-
-    def negation(self, condition):
-        return negation(condition)
-
-    def disjunction(self, condition):
-        def result(value_strings):
-            value_strings = ','.join(value_strings).split(',')
-            for value_string in value_strings:
-                if condition(value_string):
-                    self.verbose and print('Matched item: {}'.format(value_string))
-                    return True
-            return False
-        return result
 
     def match(self, arguments):
         self.reset()
