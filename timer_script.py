@@ -110,58 +110,72 @@ class Backup(object):
         return CURRENT_DATETIME > self.get_timestamp() + parse_burp_duration(maximum_age_string)
 
 
+class ConditionsArgumentsMatch(object):
+
+    def reset(self):
+        self.matched_date = CURRENT_DATETIME.date()
+
+    def __init__(self, prior_backup, verbose = False):
+        self.prior_backup = prior_backup
+        self.verbose = verbose
+        self.reset()
+
+    def matched_datetime(self, time_of_day):
+        return datetime.datetime.combine(self.matched_date, datetime.time()) + time_of_day
+
+    def weekday(self):
+        return self.matched_date.weekday()
+
+    def prior_before(self, time_of_day_string):
+        return self.matched_datetime(parse_time_of_day(time_of_day_string)) > self.prior_backup.get_timestamp()
+
+    def match_date(self, after_string):
+        self.matched_date = (CURRENT_DATETIME - parse_time_of_day(after_string)).date()
+        return True
+
+    def match_time(self, interval_string):
+        interval = parse_time_of_day_interval(interval_string)
+        self.matched_date = (CURRENT_DATETIME - interval.start).date()
+        return CURRENT_DATETIME < self.matched_datetime(interval.end)
+
+    def negation(self, condition):
+        def result(*args, **kwargs):
+            return not condition(*args, **kwargs)
+        return result
+
+    def disjunction(self, condition):
+        def result(value_strings):
+            value_strings = ','.join(value_strings).split(',')
+            for value_string in value_strings:
+                if condition(value_string):
+                    self.verbose and print('Matched item: {}'.format(value_string))
+                    return True
+            return False
+        return result
+
+
+def negation(condition):
+    def result(*args, **kwargs):
+        return not condition(*args, **kwargs)
+    return result
+
+def remote_address():
+    return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
+
+def remote_address_is_private():
+    return remote_address().is_private
+
+def remote_address_in_subnet(subnet_string):
+    return remote_address() in ipaddress.ip_network(subnet_string)
+
+
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
 
 
 def check_conditions(prior_path, *argument_strings, verbose = False):
 
-    matched_date = None
-
-    def matched_datetime(time_of_day):
-        return datetime.datetime.combine(matched_date, datetime.time()) + time_of_day
-
-    def remote_address():
-        return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
-
-    def remote_address_is_private():
-        return remote_address().is_private
-
-    def remote_address_in_subnet(subnet_string):
-        return remote_address() in ipaddress.ip_network(subnet_string)
-
-    def weekday():
-        return matched_date.weekday()
-
-    def prior_before(time_of_day_string):
-        return matched_datetime(parse_time_of_day(time_of_day_string)) > prior_backup.get_timestamp()
-
-    def match_date(after_string):
-        nonlocal matched_date
-        matched_date = (CURRENT_DATETIME - parse_time_of_day(after_string)).date()
-        return True
-
-    def match_time(interval_string):
-        nonlocal matched_date
-        interval = parse_time_of_day_interval(interval_string)
-        matched_date = (CURRENT_DATETIME - interval.start).date()
-        return CURRENT_DATETIME < matched_datetime(interval.end)
-
-    def negation(condition):
-        def result(*args, **kwargs):
-            return not condition(*args, **kwargs)
-        return result
-
-    def disjunction(condition):
-        def result(value_strings):
-            value_strings = ','.join(value_strings).split(',')
-            for value_string in value_strings:
-                if condition(value_string):
-                    verbose and print('Matched item: {}'.format(value_string))
-                    return True
-            return False
-        return result
-
     prior_backup = Backup(prior_path)
+    condition_arguments_match = ConditionsArgumentsMatch(prior_backup, verbose)
 
     conditions = (
         Condition(name = 'new', argument_action = 'store_true', call = prior_backup.is_new),
@@ -169,17 +183,17 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         Condition(name = 'continued', argument_action = 'store_true', call = prior_backup.is_continued),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
-        Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
-        Condition(name = 'not_subnet', argument_action = 'append', call = negation(disjunction(remote_address_in_subnet))),
+        Condition(name = 'subnet', argument_action = 'append', call = condition_arguments_match.disjunction(remote_address_in_subnet)),
+        Condition(name = 'not_subnet', argument_action = 'append', call = negation(condition_arguments_match.disjunction(remote_address_in_subnet))),
         # after and time conditions must be processed before any other 
         # day-related conditions because they may change matched_date
-        Condition(name = 'after', argument_action = 'store', call = match_date),
-        Condition(name = 'time', argument_action = 'append', call = disjunction(match_time)),
-        Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
-        Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
+        Condition(name = 'after', argument_action = 'store', call = condition_arguments_match.match_date),
+        Condition(name = 'time', argument_action = 'append', call = condition_arguments_match.disjunction(condition_arguments_match.match_time)),
+        Condition(name = 'workday', argument_action = 'store_true', call = lambda: condition_arguments_match.weekday() < 5),
+        Condition(name = 'holiday', argument_action = 'store_true', call = lambda: condition_arguments_match.weekday() >= 5),
         Condition(name = 'init_exceeds', argument_action = 'store', call = prior_backup.init_exceeds),
         Condition(name = 'age_exceeds', argument_action = 'store', call = prior_backup.age_exceeds),
-        Condition(name = 'prior_before', argument_action = 'store', call = prior_before),
+        Condition(name = 'prior_before', argument_action = 'store', call = condition_arguments_match.prior_before),
     )
 
     parser = argparse.ArgumentParser()
@@ -189,8 +203,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     parser.add_argument('--stop', action = 'store_true')
 
     def match_conditions(arguments):
-        nonlocal matched_date
-        matched_date = CURRENT_DATETIME.date()
+        condition_arguments_match.reset()
 
         if arguments.get('after', None) and arguments.get('time', None):
             raise ValueError('Arguments --after and --time are not compatible.')
