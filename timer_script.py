@@ -292,7 +292,6 @@ class Conditions(object):
 
 
 def check_conditions(prior_path, *argument_strings, verbose = False):
-
     prior_backup = Backup(prior_path)
     conditions = Conditions(prior_backup, verbose)
     parser = conditions.get_parser()
