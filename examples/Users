@@ -1,0 +1,10 @@
+# Perform backup every day, preferably in the evening and over the LAN.
+# Time-of-day values are strange since they are for Moscow clients (add 3 hours).
+
+# include common settings
+. common
+
+timer_arg =  --prior-before 9   --lan             --after 16           # start doing previous day backups on lan in the evening
+timer_arg =  --age-exceeds 36h         --workday  --after 1T3          # unless it was workday and we failed for 36 hours
+timer_arg =  --age-exceeds 3d                                          # anyhow if it failes for 3 days
+

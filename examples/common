@@ -1,0 +1,10 @@
+timer_arg =  --subnet 213.87.128.0/19 --stop                           # never backup by GPRS
+timer_arg =  --continued                                               # restart continued backup right away
+
+# similar rules apply to Full backups
+timer_arg =  --new              --lan  --workday  --time 0..5,16..24   # create new backups during off-hours
+timer_arg =  --new              --lan  --holiday                       # or on holidays
+timer_arg =  --init-exceeds 3d  --lan                                  # at least on lan
+timer_arg =  --init-exceeds 1w                                         # anyhow if it fails for 1 week
+timer_arg =  --new --stop                                              # but not earlier
+

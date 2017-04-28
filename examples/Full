@@ -1,0 +1,12 @@
+# Perform backup every month, preferably in the evening and over the LAN.
+# Time-of-day values are strange since they are for Moscow clients (add 3 hours).
+
+# include common settings
+. common
+
+# follow same rules as for new backups after 28 days
+timer_arg =  --age-exceeds 28d  --lan  --workday  --time 0..5,16..24
+timer_arg =  --age-exceeds 28d  --lan  --holiday
+timer_arg =  --age-exceeds 31d  --lan
+timer_arg =  --age-exceeds 35d
+
