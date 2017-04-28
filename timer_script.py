@@ -19,8 +19,6 @@ import subprocess
 
 CURRENT_DATETIME = datetime.datetime.now()
 
-CREATED_TIMESTAMP = None
-
 
 def match_full(regex, text):
     match = regex.fullmatch(text)
@@ -54,25 +52,6 @@ def parse_time_of_day_interval(text,
     return Interval(*map(parse_time_of_day, match.groups()))
 
 
-def is_backup_new(backup_path):
-    return not os.path.exists(backup_path)
-
-
-def is_backup_continued(backup_path,
-    __interrupted_backup_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
-):
-    if is_backup_new(backup_path):
-        return False
-
-    log_filename = os.path.join(backup_path, 'log.gz')
-    with gzip.open(log_filename, 'rt') as log_file:
-        for line in log_file:
-            if __interrupted_backup_regex.fullmatch(line):
-                return True
-
-    return False
-
-
 def read_timestamp(timestamp_filename):
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
@@ -86,22 +65,49 @@ def write_timestamp(timestamp_filename, timestamp, index = 0):
         timestamp_file.write('{:07} {}\n'.format(index, timestamp.replace(microsecond = 0).isoformat(' ')))
 
 
-def get_backup_timestamp(backup_path, __new_timestamp = datetime.datetime(1, 1, 1)):
-    if is_backup_new(backup_path):
-        return __new_timestamp
+class Backup(object):
 
-    timestamp_filename = os.path.join(backup_path, 'timestamp')
-    return read_timestamp(timestamp_filename)
+    def __get_client_created_timestamp(self):
+        directory, _ = os.path.split(self.path)
+        filename = os.path.join(directory, 'created_timestamp')
+        if not os.path.exists(filename):
+            os.makedirs(directory, exist_ok = True)
+            write_timestamp(filename, CURRENT_DATETIME)
+        return read_timestamp(filename)
 
+    def __init__(self, path):
+        self.path = path
+        self.client_created = self.__get_client_created_timestamp() if self.is_new() else None
 
-def set_created_timestamp(prior_path):
-    global CREATED_TIMESTAMP
-    created_timestamp_directory, _ = os.path.split(prior_path)
-    created_timestamp_filename = os.path.join(created_timestamp_directory, 'created_timestamp')
-    if not os.path.exists(created_timestamp_filename):
-        os.makedirs(created_timestamp_directory, exist_ok = True)
-        write_timestamp(created_timestamp_filename, CURRENT_DATETIME)
-    CREATED_TIMESTAMP = read_timestamp(created_timestamp_filename)
+    def is_new(self):
+        return not os.path.exists(self.path)
+
+    def is_continued(self,
+        __interrupted_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
+    ):
+        if self.is_new():
+            return False
+
+        log_filename = os.path.join(self.path, 'log.gz')
+        with gzip.open(log_filename, 'rt') as log_file:
+            for line in log_file:
+                if __interrupted_regex.fullmatch(line):
+                    return True
+
+        return False
+
+    def get_timestamp(self, __new_timestamp = datetime.datetime(1, 1, 1)):
+        if self.is_new():
+            return __new_timestamp
+
+        timestamp_filename = os.path.join(self.path, 'timestamp')
+        return read_timestamp(timestamp_filename)
+
+    def init_exceeds(self, maximum_age_string):
+        return self.is_new() and CURRENT_DATETIME > self.client_created + parse_burp_duration(maximum_age_string)
+
+    def age_exceeds(self, maximum_age_string):
+        return CURRENT_DATETIME > self.get_timestamp() + parse_burp_duration(maximum_age_string)
 
 
 Condition = collections.namedtuple('Condition', ('name', 'argument_action', 'call'))
@@ -113,9 +119,6 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     def matched_datetime(time_of_day):
         return datetime.datetime.combine(matched_date, datetime.time()) + time_of_day
-
-    def is_new():
-        return is_backup_new(prior_path)
 
     def remote_address():
         return ipaddress.ip_address(os.environ['REMOTE_ADDR'])
@@ -129,14 +132,8 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     def weekday():
         return matched_date.weekday()
 
-    def init_exceeds(maximum_age_string):
-        return is_backup_new(prior_path) and CURRENT_DATETIME > CREATED_TIMESTAMP + parse_burp_duration(maximum_age_string)
-
-    def age_exceeds(maximum_age_string):
-        return CURRENT_DATETIME > get_backup_timestamp(prior_path) + parse_burp_duration(maximum_age_string)
-
     def prior_before(time_of_day_string):
-        return matched_datetime(parse_time_of_day(time_of_day_string)) > get_backup_timestamp(prior_path)
+        return matched_datetime(parse_time_of_day(time_of_day_string)) > prior_backup.get_timestamp()
 
     def match_date(after_string):
         nonlocal matched_date
@@ -164,10 +161,12 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
             return False
         return result
 
+    prior_backup = Backup(prior_path)
+
     conditions = (
-        Condition(name = 'new', argument_action = 'store_true', call = is_new),
-        Condition(name = 'not_new', argument_action = 'store_true', call = negation(is_new)),
-        Condition(name = 'continued', argument_action = 'store_true', call = lambda: is_backup_continued(prior_path)),
+        Condition(name = 'new', argument_action = 'store_true', call = prior_backup.is_new),
+        Condition(name = 'not_new', argument_action = 'store_true', call = negation(prior_backup.is_new)),
+        Condition(name = 'continued', argument_action = 'store_true', call = prior_backup.is_continued),
         Condition(name = 'lan', argument_action = 'store_true', call = remote_address_is_private),
         Condition(name = 'not_lan', argument_action = 'store_true', call = negation(remote_address_is_private)),
         Condition(name = 'subnet', argument_action = 'append', call = disjunction(remote_address_in_subnet)),
@@ -178,13 +177,10 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         Condition(name = 'time', argument_action = 'append', call = disjunction(match_time)),
         Condition(name = 'workday', argument_action = 'store_true', call = lambda: weekday() < 5),
         Condition(name = 'holiday', argument_action = 'store_true', call = lambda: weekday() >= 5),
-        Condition(name = 'init_exceeds', argument_action = 'store', call = init_exceeds),
-        Condition(name = 'age_exceeds', argument_action = 'store', call = age_exceeds),
+        Condition(name = 'init_exceeds', argument_action = 'store', call = prior_backup.init_exceeds),
+        Condition(name = 'age_exceeds', argument_action = 'store', call = prior_backup.age_exceeds),
         Condition(name = 'prior_before', argument_action = 'store', call = prior_before),
     )
-
-    if is_backup_new(prior_path):
-         set_created_timestamp(prior_path)
 
     parser = argparse.ArgumentParser()
     for condition in conditions:

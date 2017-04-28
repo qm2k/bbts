@@ -17,6 +17,9 @@ TEST_BACKUPS = os.path.join(os.path.dirname(__file__), '_test_data', 'backups')
 def get_backup_path(backup_name = 'default'):
     return os.path.join(TEST_BACKUPS, backup_name, 'current')
 
+def get_backup(backup_name = 'default'):
+    return timer_script.Backup(get_backup_path(backup_name))
+
 
 class FakeTime(object):
     def __init__(self, text):
@@ -93,27 +96,27 @@ class Test_parse_time_of_day_interval(unittest.TestCase):
         assert timer_script.parse_time_of_day_interval('-1T2:3..-4T5:6') == expected_result
 
 
-class Test_is_backup_continued(unittest.TestCase):
+class Test_Backup_is_continued(unittest.TestCase):
 
     def test_continued(self):
-        assert timer_script.is_backup_continued(get_backup_path('continued'))
+        assert get_backup('continued').is_continued()
 
     def test_onepiece(self):
-        assert not timer_script.is_backup_continued(get_backup_path('onepiece'))
+        assert not get_backup('onepiece').is_continued()
 
 
-class Test_get_backup_timestamp(unittest.TestCase):
+class Test_Backup_get_timestamp(unittest.TestCase):
 
     def test_constant(self):
         expected_result = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
-        assert timer_script.get_backup_timestamp(get_backup_path('timestamp')) == expected_result
+        assert get_backup('timestamp').get_timestamp() == expected_result
 
     def test_dynamic(self):
         backup_path = get_backup_path('dynamic_timestamp')
         timestamp = datetime.datetime.now()
         timer_script.write_timestamp(os.path.join(backup_path, 'timestamp'), timestamp)
         expected_result = timestamp.replace(microsecond = 0)
-        assert timer_script.get_backup_timestamp(get_backup_path('dynamic_timestamp')) == expected_result
+        assert timer_script.Backup(backup_path).get_timestamp() == expected_result
 
 
 class Test_check_conditions(unittest.TestCase):
