@@ -295,7 +295,18 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     prior_backup = Backup(prior_path)
     conditions = Conditions(prior_backup, verbose)
     parser = conditions.get_parser()
-    parser.add_argument('--stop', action = 'store_true')
+    parser.add_argument('--stop', action = 'store_true',
+        help = 'Cancel backup and do not process any more timer_args.')
+
+    if '--help' in argument_strings:
+        print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...>\n')
+        parser.print_help()
+        print()
+        print('variable formats:')
+        print('  {:22}{}'.format('IP-NETWORK', 'See ipaddress.ip_network(...)'))
+        print('  {:22}{}'.format('TIME-OF-DAY', TIME_OF_DAY_REGEX.pattern))
+        print('  {:22}{}'.format('DURATION', BURP_DURATION_REGEX.pattern))
+        sys.exit(os.EX_USAGE)
 
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
@@ -308,21 +319,13 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     return False
 
 
-def print_help():
-    print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...>\n')
-    Conditions(Backup(None)).get_parser().print_help()
-    print()
-    print('variable formats:')
-    print('  {:22}{}'.format('IP-NETWORK', 'See ipaddress.ip_network(...)'))
-    print('  {:22}{}'.format('TIME-OF-DAY', TIME_OF_DAY_REGEX.pattern))
-    print('  {:22}{}'.format('DURATION', BURP_DURATION_REGEX.pattern))
-
-
 def main(arguments):
     '''Main function.'''
+
     if len(arguments) < 7 or '--help' in arguments:
-        print_help()
-        return os.EX_USAGE
+        check_conditions(None, '--help')
+        return
+
     client_name, prior_path, data_path = arguments[1:4]
     assert os.path.exists(data_path)
 
