@@ -135,10 +135,13 @@ class Test_check_conditions(unittest.TestCase):
 
     def test_no_arguments(self):
         with self.assertRaises(ValueError):
-            assert timer_script.check_conditions(get_backup_path(), '')
-            assert timer_script.check_conditions(get_backup_path('empty'), '')
-            assert timer_script.check_conditions(get_backup_path(), '# this is a comment --lan')
-            assert timer_script.check_conditions(get_backup_path('empty'), '# this is a comment --lan')
+            timer_script.check_conditions(get_backup_path(), '')
+        with self.assertRaises(ValueError):
+            timer_script.check_conditions(get_backup_path('empty'), '')
+        with self.assertRaises(ValueError):
+            timer_script.check_conditions(get_backup_path(), '# this is a comment --lan')
+        with self.assertRaises(ValueError):
+            timer_script.check_conditions(get_backup_path('empty'), '# this is a comment --lan')
 
     def test_comment(self):
         assert timer_script.check_conditions(get_backup_path('continued'), '--continued # this is another comment --lan')
