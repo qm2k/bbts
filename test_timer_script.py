@@ -225,15 +225,29 @@ class Test_check_conditions(unittest.TestCase):
 
     def test_weekday(self):
         backup_path = get_backup_path()
+        assert timer_script.check_conditions(backup_path, '--weekday Sun,Mon,Tue,Wed,Thu,Fri,Sat')
+        assert not timer_script.check_conditions(backup_path, '--not-weekday Sun,Mon,Tue,Wed,Thu,Fri,Sat')
         with FakeTime('2017-04-25 14:46:05'):
-            assert timer_script.check_conditions(backup_path, '--workday')
-            assert not timer_script.check_conditions(backup_path, '--holiday')
+            assert timer_script.check_conditions(backup_path, '--weekday Tue')
+            assert not timer_script.check_conditions(backup_path, '--not-weekday Tue')
+            assert not timer_script.check_conditions(backup_path, '--weekday Sun')
+            assert timer_script.check_conditions(backup_path, '--not-weekday Sun')
+            assert timer_script.check_conditions(backup_path, '--not-weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--weekday Sat,Sun')
         with FakeTime('2017-04-22 14:46:05'):
-            assert not timer_script.check_conditions(backup_path, '--workday')
-            assert timer_script.check_conditions(backup_path, '--holiday')
+            assert not timer_script.check_conditions(backup_path, '--weekday Tue')
+            assert timer_script.check_conditions(backup_path, '--not-weekday Tue')
+            assert not timer_script.check_conditions(backup_path, '--weekday Sun')
+            assert timer_script.check_conditions(backup_path, '--not-weekday Sun')
+            assert not timer_script.check_conditions(backup_path, '--not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--weekday Sat,Sun')
         with FakeTime('2017-04-23 14:46:05'):
-            assert not timer_script.check_conditions(backup_path, '--workday')
-            assert timer_script.check_conditions(backup_path, '--holiday')
+            assert not timer_script.check_conditions(backup_path, '--weekday Tue')
+            assert timer_script.check_conditions(backup_path, '--not-weekday Tue')
+            assert timer_script.check_conditions(backup_path, '--weekday Sun')
+            assert not timer_script.check_conditions(backup_path, '--not-weekday Sun')
+            assert not timer_script.check_conditions(backup_path, '--not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--weekday Sat,Sun')
 
     def test_age_exceeds(self):
         backup_path = get_backup_path('20h')
@@ -296,10 +310,10 @@ class Test_check_conditions(unittest.TestCase):
     def test_weekday__and__after(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-24 14:46:05'):
-            assert timer_script.check_conditions(backup_path, '--after 14 --workday')
-            assert not timer_script.check_conditions(backup_path, '--after 14 --holiday')
-            assert not timer_script.check_conditions(backup_path, '--after 38 --workday')
-            assert timer_script.check_conditions(backup_path, '--after 38 --holiday')
+            assert timer_script.check_conditions(backup_path, '--after 14 --not-weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--after 14 --weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--after 38 --not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--after 38 --weekday Sat,Sun')
 
     def test_time(self):
         backup_path = get_backup_path()
@@ -321,20 +335,20 @@ class Test_check_conditions(unittest.TestCase):
     def test_weekday__and__time(self):
         backup_path = get_backup_path()
         with FakeTime('2017-04-24 14:46:05'):
-            assert timer_script.check_conditions(backup_path, '--time 14..15,38..39 --workday')
-            assert not timer_script.check_conditions(backup_path, '--time 14..15,38..39 --holiday')
-            assert not timer_script.check_conditions(backup_path, '--time 38..39,14..15 --workday')
-            assert timer_script.check_conditions(backup_path, '--time 38..39,14..15 --holiday')
+            assert timer_script.check_conditions(backup_path, '--time 14..15,38..39 --not-weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--time 14..15,38..39 --weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--time 38..39,14..15 --not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--time 38..39,14..15 --weekday Sat,Sun')
 
-            assert not timer_script.check_conditions(backup_path, '--time 13..14,38..39 --workday')
-            assert timer_script.check_conditions(backup_path, '--time 13..14,38..39 --holiday')
-            assert timer_script.check_conditions(backup_path, '--time 37..38,14..15 --workday')
-            assert not timer_script.check_conditions(backup_path, '--time 37..38,14..15 --holiday')
+            assert not timer_script.check_conditions(backup_path, '--time 13..14,38..39 --not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--time 13..14,38..39 --weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--time 37..38,14..15 --not-weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--time 37..38,14..15 --weekday Sat,Sun')
 
-            assert timer_script.check_conditions(backup_path, '--time 14..15 --workday')
-            assert not timer_script.check_conditions(backup_path, '--time 14..15 --holiday')
-            assert not timer_script.check_conditions(backup_path, '--time 38..39 --workday')
-            assert timer_script.check_conditions(backup_path, '--time 38..39 --holiday')
+            assert timer_script.check_conditions(backup_path, '--time 14..15 --not-weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--time 14..15 --weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--time 38..39 --not-weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--time 38..39 --weekday Sat,Sun')
 
     def test_time__combinations(self):
         backup_path = get_backup_path()

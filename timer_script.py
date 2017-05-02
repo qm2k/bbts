@@ -59,6 +59,12 @@ def parse_time_of_day(text):
     return datetime.timedelta(**kwargs)
 
 
+WEEKDAYS = ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
+
+def parse_weekday(text):
+    return WEEKDAYS.index(text)
+
+
 Interval = collections.namedtuple('Interval', ('start', 'end'))
 
 def parse_time_of_day_interval(text,
@@ -172,20 +178,17 @@ class Conditions(object):
                 call = self.match_date,
                 help = '; '.join((
                     'current day starts after specified time-of-day',
-                    'affects --workday, --holiday, --prior-before',
+                    'affects --weekday, --prior-before',
                     'incompatible with --time'))),
             Condition(name = 'time', type = [parse_time_of_day_interval],
                 call = self.match_time_interval,
                 help = '; '.join((
                     'current time belongs to any of specified intervals',
-                    'affects --workday, --holiday, --prior-before for ranges outside 0..24',
+                    'affects --weekday, --prior-before for ranges outside 0..24',
                     'incompatible with --after'))),
-            Condition(name = 'workday', type = bool,
-                call = lambda: self.weekday() < 5,
-                help = 'current day of week is not Saturday or Sunday'),
-            Condition(name = 'holiday', type = bool,
-                call = lambda: self.weekday() >= 5,
-                help = 'current day of week is Saturday or Sunday'),
+            Condition(name = 'weekday', type = [parse_weekday],
+                call = lambda weekday: self.weekday() == weekday,
+                help = 'current day of week is one of specified values'),
             Condition(name = 'init_exceeds', type = parse_burp_duration,
                 call = self.prior_backup.init_exceeds,
                 help = 'attempts to create initial backup took more than specified duration'),
@@ -215,6 +218,7 @@ class Conditions(object):
             parse_time_of_day: 'TIME-OF-DAY',
             parse_time_of_day_interval: 'TIME-OF-DAY..TIME-OF-DAY',
             parse_burp_duration: 'DURATION',
+            parse_weekday: 'WEEKDAY',
         }
         parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
         for condition in Conditions(Backup(path = None)).__get_conditions():
@@ -309,6 +313,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         print('  {:22}{}'.format('IP-NETWORK', 'See ipaddress.ip_network(...)'))
         print('  {:22}{}'.format('TIME-OF-DAY', TIME_OF_DAY_REGEX.pattern))
         print('  {:22}{}'.format('DURATION', BURP_DURATION_REGEX.pattern))
+        print('  {:22}{}'.format('WEEKDAY', '|'.join(WEEKDAYS)))
         sys.exit(os.EX_USAGE)
 
     for argument_string in argument_strings:
