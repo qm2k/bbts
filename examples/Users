@@ -6,5 +6,5 @@
 
 timer_arg =  --prior-before 9   --lan             --after 16           # start doing previous day backups on lan in the evening
 timer_arg =  --age-exceeds 36h         --workday  --after 1T3          # unless it was workday and we failed for 36 hours
-timer_arg =  --age-exceeds 3d                                          # anyhow if it failes for 3 days
+timer_arg =  --age-exceeds 3d                                          # anyhow if it fails for 3 days
 
