@@ -152,7 +152,7 @@ class Conditions(object):
             value_strings = ','.join(value_strings).split(',')
             for value_string in value_strings:
                 if condition(value_string):
-                    self.verbose and print('Matched item: {}'.format(value_string))
+                    self.verbose and len(value_strings) > 1 and print('Matched item: {}'.format(value_string))
                     return True
             return False
         return result
