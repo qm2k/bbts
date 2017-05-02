@@ -178,14 +178,20 @@ class Conditions(object):
                 call = self.match_date,
                 help = '; '.join((
                     'current day starts after specified time-of-day',
-                    'affects --weekday, --prior-before',
+                    'affects --(not-)weekday, --(not-)prior-before, --not-time',
                     'incompatible with --time'))),
             Condition(name = 'time', type = [parse_time_of_day_interval],
                 call = self.match_time_interval,
                 help = '; '.join((
                     'current time belongs to any of specified intervals',
-                    'affects --weekday, --prior-before for ranges outside 0..24',
+                    'affects --(not-)weekday, --(not-)prior-before, --not-time for ranges outside 0..24',
                     'incompatible with --after'))),
+            Condition(name = 'not_time', type = [parse_time_of_day_interval],
+                call = self.check_time_interval,
+                help = '; '.join((
+                    'current time does not belongs to any of specified intervals',
+                    'does not affect --(not-)weekday, --(not-)prior-before',
+                    'compatible with --after and --time'))),
             Condition(name = 'weekday', type = [parse_weekday],
                 call = lambda weekday: self.weekday() == weekday,
                 help = 'current day of week is one of specified values'),
@@ -241,6 +247,9 @@ class Conditions(object):
                 parser.add_argument(option_name, **kwargs)
 
                 # prepare inversion
+                if name in ('after', 'time', 'not_time'):
+                    # --not-after is meaningless, --not-time is handled separately
+                    break
                 name = 'not_' + name
                 kwargs['help'] = 'inverted version of {}'.format(option_name)
         return parser
@@ -262,6 +271,9 @@ class Conditions(object):
         self.match_date(interval.start)
         return CURRENT_DATETIME < self.matched_datetime(interval.end)
 
+    def check_time_interval(self, interval):
+        return self.matched_datetime(interval.start) <= CURRENT_DATETIME < self.matched_datetime(interval.end)
+
     def match(self, arguments):
         self.reset()
 
@@ -280,6 +292,10 @@ class Conditions(object):
                 call_function = convert_call(call_function, condition.type)
 
             for invert in (False, True):
+                # handles both inversion and special case of --not-time
+                if name.startswith('not_'):
+                    call_function = negation(call_function)
+
                 argument_value = arguments.pop(name, None)
                 if argument_value not in (None, False):
                     argument_found = True
@@ -289,8 +305,10 @@ class Conditions(object):
                         return False
 
                 # prepare inversion
+                if name in ('after', 'time', 'not_time'):
+                    # --not-after is meaningless, --not-time is handled separately
+                    break
                 name = 'not_' + name
-                call_function = negation(call_function)
 
         if not argument_found:
             raise ValueError('No arguments found.', arguments)
