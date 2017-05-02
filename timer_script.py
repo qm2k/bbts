@@ -287,7 +287,7 @@ class Conditions(object):
                 return False
 
         if not argument_found:
-            raise ValueError('No arguments found.')
+            raise ValueError('No arguments found.', arguments)
 
         return True
 
