@@ -297,7 +297,7 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
     conditions = Conditions(prior_backup, verbose)
     parser = Conditions.get_parser()
     parser.add_argument('--stop', action = 'store_true',
-        help = 'Cancel backup and do not process any more timer_args.')
+        help = 'cancel backup and do not process any more timer_args')
 
     if '--help' in argument_strings:
         print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...>\n')
