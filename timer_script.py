@@ -215,7 +215,8 @@ class Conditions(object):
         self.conditions = self.__get_conditions()
         self.reset()
 
-    def get_parser(self):
+    @staticmethod
+    def get_parser():
         metavars = {
             bool: None,
             ipaddress.ip_address: 'IP-ADDRESS',
@@ -225,7 +226,7 @@ class Conditions(object):
             parse_burp_duration: 'DURATION',
         }
         parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
-        for condition in self.conditions:
+        for condition in Conditions(Backup(path = None)).__get_conditions():
             assert '-' not in condition.name
             if isinstance(condition.type, list):
                 [inner_type] = condition.type
@@ -294,7 +295,7 @@ class Conditions(object):
 def check_conditions(prior_path, *argument_strings, verbose = False):
     prior_backup = Backup(prior_path)
     conditions = Conditions(prior_backup, verbose)
-    parser = conditions.get_parser()
+    parser = Conditions.get_parser()
     parser.add_argument('--stop', action = 'store_true',
         help = 'Cancel backup and do not process any more timer_args.')
 
