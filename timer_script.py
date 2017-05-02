@@ -157,24 +157,15 @@ class Conditions(object):
             Condition(name = 'new', type = bool,
                 call = self.prior_backup.is_new,
                 help = 'there is no prior backup'),
-            Condition(name = 'not_new', type = bool,
-                call = self.prior_backup.is_new,
-                help = 'there is at least one prior backup'),
             Condition(name = 'continued', type = bool,
                 call = self.prior_backup.is_continued,
                 help = 'prior backup was interrupted and continued'),
             Condition(name = 'lan', type = bool,
                 call = lambda: remote_address().is_private,
                 help = 'client ip address is private'),
-            Condition(name = 'not_lan', type = bool,
-                call = lambda: remote_address().is_private,
-                help = 'client ip address is not private'),
             Condition(name = 'subnet', type = [ipaddress.ip_network],
                 call = lambda subnet: remote_address() in subnet,
                 help = 'client ip address belongs to any of specified subnet(s)'),
-            Condition(name = 'not_subnet', type = [ipaddress.ip_network],
-                call = lambda subnet: remote_address() in subnet,
-                help = 'client ip address does not belong to any of specified subnet(s)'),
             # after and time conditions must be processed before any other 
             # day-related conditions because they may change matched_date
             Condition(name = 'after', type = parse_time_of_day,
@@ -227,19 +218,27 @@ class Conditions(object):
         }
         parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
         for condition in Conditions(Backup(path = None)).__get_conditions():
-            assert '-' not in condition.name
+            name = condition.name
+            kwargs = {'help': condition.help}
             if isinstance(condition.type, list):
                 [inner_type] = condition.type
-                metavar = metavars[inner_type] + ',...'
-                action = 'append'
+                kwargs['metavar'] = metavars[inner_type] + ',...'
+                kwargs['action'] = 'append'
             else:
-                metavar = metavars[condition.type]
-                action = 'store_true' if condition.type == bool else 'store'
-            parser.add_argument(
-                '--' + condition.name.replace('_', '-'),
-                action = action,
-                help = condition.help,
-                **{'metavar': metavar for _ in range(0, bool(metavar))})
+                kwargs['metavar'] = metavars[condition.type]
+                kwargs['action'] = 'store_true' if condition.type == bool else 'store'
+            if not kwargs['metavar']:
+                del kwargs['metavar']
+
+            for invert in (False, True):
+                assert '-' not in name
+                kwargs['dest'] = name
+                option_name = '--' + name.replace('_', '-')
+                parser.add_argument(option_name, **kwargs)
+
+                # prepare inversion
+                name = 'not_' + name
+                kwargs['help'] = 'inverted version of {}'.format(option_name)
         return parser
 
     def matched_datetime(self, time_of_day):
@@ -267,10 +266,7 @@ class Conditions(object):
 
         argument_found = False
         for condition in self.conditions:
-            argument_value = arguments.get(condition.name, None)
-            if argument_value in (None, False):
-                continue
-            argument_found = True
+            name = condition.name
 
             call_function = condition.call
             if isinstance(condition.type, list):
@@ -278,13 +274,19 @@ class Conditions(object):
                 call_function = self.disjunction(convert_call(call_function, inner_type))
             elif condition.type != bool:
                 call_function = convert_call(call_function, condition.type)
-            if condition.name.startswith('not_'):
-                call_function = negation(call_function)
 
-            call_arguments = (argument_value,) if argument_value != True else ()
-            if not call_function(*call_arguments):
-                self.verbose and print('Failed condition: --{} {}'.format(condition.name, argument_value))
-                return False
+            for invert in (False, True):
+                argument_value = arguments.pop(name, None)
+                if argument_value not in (None, False):
+                    argument_found = True
+                    call_arguments = (argument_value,) if argument_value != True else ()
+                    if not call_function(*call_arguments):
+                        self.verbose and print('Failed condition: --{} {}'.format(name.replace('_', '-'), argument_value))
+                        return False
+
+                # prepare inversion
+                name = 'not_' + name
+                call_function = negation(call_function)
 
         if not argument_found:
             raise ValueError('No arguments found.', arguments)
@@ -311,11 +313,13 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
 
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
+        arguments = dict(arguments) # make a copy
         if conditions.match(arguments):
             verbose and print('Matched: {}'.format(argument_string))
-            if arguments.get('stop', False):
-                return False
-            return True
+            must_stop = arguments.pop('stop', False)
+            # make sure all arguments were handled
+            assert not arguments, arguments
+            return not must_stop
 
     return False
 
