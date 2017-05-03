@@ -216,7 +216,7 @@ class Conditions(object):
         self.reset()
 
     @staticmethod
-    def get_parser():
+    def add_arguments(parser):
         metavars = {
             bool: None,
             ipaddress.ip_address: 'IP-ADDRESS',
@@ -226,7 +226,6 @@ class Conditions(object):
             parse_burp_duration: 'DURATION',
             parse_weekday: 'WEEKDAY',
         }
-        parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
         for condition in Conditions(Backup(path = None)).__get_conditions():
             name = condition.name
             kwargs = {'help': condition.help}
@@ -252,7 +251,7 @@ class Conditions(object):
                     break
                 name = 'not_' + name
                 kwargs['help'] = 'inverted version of {}'.format(option_name)
-        return parser
+        return
 
     def matched_datetime(self, time_of_day):
         return datetime.datetime.combine(self.matched_date, datetime.time()) + time_of_day
@@ -319,7 +318,8 @@ class Conditions(object):
 def check_conditions(prior_path, *argument_strings, verbose = False):
     prior_backup = Backup(prior_path)
     conditions = Conditions(prior_backup, verbose)
-    parser = Conditions.get_parser()
+    parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
+    Conditions.add_arguments(parser)
     parser.add_argument('--stop', action = 'store_true',
         help = 'cancel backup and do not process any more timer_args')
 
