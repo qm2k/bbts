@@ -314,14 +314,21 @@ class Conditions(object):
 
         return True
 
+def create_parser():
+    parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
+
+    conditions_group = parser.add_argument_group(title = 'conditions')
+    Conditions.add_arguments(conditions_group)
+
+    flow_control_group = parser.add_argument_group(title = 'flow control')
+    flow_control_group .add_argument('--stop', action = 'store_true',
+        help = 'cancel backup and do not process any more timer_args')
+
+    return parser
+
 
 def check_conditions(prior_path, *argument_strings, verbose = False):
-    prior_backup = Backup(prior_path)
-    conditions = Conditions(prior_backup, verbose)
-    parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
-    Conditions.add_arguments(parser)
-    parser.add_argument('--stop', action = 'store_true',
-        help = 'cancel backup and do not process any more timer_args')
+    parser = create_parser()
 
     if '--help' in argument_strings:
         print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...>\n')
@@ -334,6 +341,8 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         print('  {:22}{}'.format('WEEKDAY', '|'.join(WEEKDAYS)))
         sys.exit(os.EX_USAGE)
 
+    prior_backup = Backup(prior_path)
+    conditions = Conditions(prior_backup, verbose)
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
         arguments = dict(arguments) # make a copy
