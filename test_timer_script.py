@@ -252,7 +252,7 @@ class Test_check_conditions(unittest.TestCase):
         backup_path = get_backup_path('dynamic_presence')
         if os.path.exists(backup_path):
             os.rmdir(backup_path)
-        created_timestamp_filename = os.path.join(os.path.split(backup_path)[0], 'created_timestamp')
+        created_timestamp_filename = os.path.join(os.path.split(backup_path)[0], 'created')
         if os.path.exists(created_timestamp_filename):
             os.remove(created_timestamp_filename)
 

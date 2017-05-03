@@ -91,7 +91,7 @@ class Backup(object):
 
     def __get_client_created_timestamp(self):
         directory, _ = os.path.split(self.path)
-        filename = os.path.join(directory, 'created_timestamp')
+        filename = os.path.join(directory, 'created')
         if not os.path.exists(filename):
             os.makedirs(directory, exist_ok = True)
             write_timestamp(filename, CURRENT_DATETIME)
