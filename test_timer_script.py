@@ -180,6 +180,36 @@ class Test_check_conditions(unittest.TestCase):
                 assert result.stderr == '', result
                 assert (result.returncode == os.EX_OK) == (condition == '--lan'), result
 
+    def test_verbose(self):
+        backup_path = get_backup_path()
+        command = (timer_script.__file__, 'test', backup_path, TEST_BACKUPS, '-', '-')
+        NOTHING_MATCHED = 'Nothing matched.\n'
+        LAN_MATCHED = 'Matched: --lan\n'
+        VERBOSE_LAN_MATCHED = 'Matched: --verbose --lan\n'
+        FAILED_CONDITION = 'Failed condition: --not-lan True\n'
+        with RemoteAddress('10.10.10.10'):
+            for arguments, expected_stdout in (
+                (('--verbose',), NOTHING_MATCHED),
+                (('--verbose', '--lan'), LAN_MATCHED),
+                (('--verbose', '--not-lan'), FAILED_CONDITION + NOTHING_MATCHED),
+                (('--verbose', '--lan', '--not-lan'), LAN_MATCHED),
+                (('--verbose', '--not-lan', '--lan'), FAILED_CONDITION + LAN_MATCHED),
+                (('--lan', '--verbose', '--not-lan'), ''),
+                (('--not-lan', '--verbose', '--lan'), LAN_MATCHED),
+                (('--verbose --lan',), VERBOSE_LAN_MATCHED),
+                (('--verbose --not-lan',), FAILED_CONDITION),
+                (('--verbose --not-lan', '--lan'), FAILED_CONDITION),
+                (('--verbose --not-lan', '--not-lan'), FAILED_CONDITION),
+            ):
+                result = subprocess.run(command + arguments,
+                    input = '',
+                    stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE,
+                    check = False,
+                    universal_newlines = True)
+                assert result.stdout == expected_stdout, (result, expected_stdout)
+                assert result.stderr == '', result
+
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())
         assert not timer_script.check_conditions(get_backup_path('empty'))

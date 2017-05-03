@@ -208,10 +208,10 @@ class Conditions(object):
 
     def reset(self):
         self.matched_date = CURRENT_DATETIME.date()
+        self.verbose = False
 
-    def __init__(self, prior_backup, verbose = False):
+    def __init__(self, prior_backup):
         self.prior_backup = prior_backup
-        self.verbose = verbose
         self.conditions = self.__get_conditions()
         self.reset()
 
@@ -273,13 +273,19 @@ class Conditions(object):
     def check_time_interval(self, interval):
         return self.matched_datetime(interval.start) <= CURRENT_DATETIME < self.matched_datetime(interval.end)
 
-    def match(self, arguments):
+    def match(self, arguments, environment):
         self.reset()
+
+        environment_arguments = {}
+        self.verbose = environment['verbose']
+        if arguments.pop('verbose', None):
+            environment_arguments['verbose'] = True
+            self.verbose = True
 
         if arguments.get('after', None) and arguments.get('time', None):
             raise ValueError('Arguments --after and --time are not compatible.')
 
-        argument_found = False
+        condition_found = False
         for condition in self.conditions:
             name = condition.name
 
@@ -297,7 +303,7 @@ class Conditions(object):
 
                 argument_value = arguments.pop(name, None)
                 if argument_value not in (None, False):
-                    argument_found = True
+                    condition_found = True
                     call_arguments = (argument_value,) if argument_value != True else ()
                     if not call_function(*call_arguments):
                         self.verbose and print('Failed condition: --{} {}'.format(name.replace('_', '-'), argument_value))
@@ -309,13 +315,21 @@ class Conditions(object):
                     break
                 name = 'not_' + name
 
-        if not argument_found:
-            raise ValueError('No arguments found.', arguments)
+        if not condition_found:
+            if not environment_arguments:
+                raise ValueError('No arguments found.', arguments)
+            environment.update(environment_arguments)
+            return False
 
         return True
 
 def create_parser():
     parser = argparse.ArgumentParser(prog = 'timer_arg =', add_help = False, allow_abbrev = False)
+
+    environment_group = parser.add_argument_group(title = 'environment options',
+        description = 'acts on a single timer_arg line unless placed on a line of their own')
+    environment_group .add_argument('--verbose', action = 'store_true',
+        help = 'verbose output')
 
     conditions_group = parser.add_argument_group(title = 'conditions')
     Conditions.add_arguments(conditions_group)
@@ -327,7 +341,7 @@ def create_parser():
     return parser
 
 
-def check_conditions(prior_path, *argument_strings, verbose = False):
+def check_conditions(prior_path, *argument_strings):
     parser = create_parser()
 
     if '--help' in argument_strings:
@@ -342,17 +356,19 @@ def check_conditions(prior_path, *argument_strings, verbose = False):
         sys.exit(os.EX_USAGE)
 
     prior_backup = Backup(prior_path)
-    conditions = Conditions(prior_backup, verbose)
+    conditions = Conditions(prior_backup)
+    environment = {'verbose': False}
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
         arguments = dict(arguments) # make a copy
-        if conditions.match(arguments):
-            verbose and print('Matched: {}'.format(argument_string))
+        if conditions.match(arguments, environment):
+            conditions.verbose and print('Matched: {}'.format(argument_string))
             must_stop = arguments.pop('stop', False)
             # make sure all arguments were handled
             assert not arguments, arguments
             return not must_stop
 
+    environment['verbose'] and print('Nothing matched.')
     return False
 
 
@@ -367,7 +383,7 @@ def main(arguments):
     assert os.path.exists(data_path)
 
     argument_strings = arguments[6:]
-    conditions_check = check_conditions(prior_path, *argument_strings, verbose = True)
+    conditions_check = check_conditions(prior_path, *argument_strings)
     return {True: os.EX_OK, False: not os.EX_OK}[conditions_check]
 
 
