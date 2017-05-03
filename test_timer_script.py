@@ -25,6 +25,7 @@ import timer_script
 import unittest
 
 import datetime
+import subprocess
 
 
 TEST_BACKUPS = os.path.join(os.path.dirname(__file__), '_test_data', 'backups')
@@ -146,6 +147,38 @@ class Test_check_conditions(unittest.TestCase):
             datetime.datetime.now().date() - datetime.timedelta(days = 1),
             datetime.time(hour = 9))
         timer_script.write_timestamp(filename, timestamp)
+
+    def test_help(self):
+        for arguments in (
+            (),
+            ('--help',),
+            ('-', '-', '-', '-', '-'),
+            ('-', '-', '-', '-', '-', '--help'),
+        ):
+            result = subprocess.run((timer_script.__file__,) + arguments,
+                input = '',
+                stdout = subprocess.PIPE,
+                stderr = subprocess.PIPE,
+                check = False,
+                universal_newlines = True)
+            assert result.stdout != '', result
+            assert result.stderr == '', result
+            assert result.returncode == os.EX_USAGE, result
+
+    def test_return_code(self):
+        backup_path = get_backup_path()
+        command = (timer_script.__file__, 'test', backup_path, TEST_BACKUPS, '-', '-')
+        with RemoteAddress('10.10.10.10'):
+            for condition in ('--lan', '--not-lan'):
+                result = subprocess.run(command + (condition,),
+                    input = '',
+                    stdout = subprocess.PIPE,
+                    stderr = subprocess.PIPE,
+                    check = False,
+                    universal_newlines = True)
+                assert result.stdout == '', result
+                assert result.stderr == '', result
+                assert (result.returncode == os.EX_OK) == (condition == '--lan'), result
 
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())
