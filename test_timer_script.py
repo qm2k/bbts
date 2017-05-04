@@ -235,8 +235,11 @@ class Test_check_conditions(unittest.TestCase):
             assert not timer_script.check_conditions(backup_path, '--time 15..16')
 
             assert not timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 14..15')
+            assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--utc-offset=- --time 14..15')
             assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 8..9')
+            assert not timer_script.check_conditions(backup_path, '--utc-offset +0300', '--utc-offset=- --time 8..9')
             assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 14..15', '--time 8..9')
+            assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--utc-offset=-', '--time 14..15')
             assert not timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 8..9')
             assert timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 14..15')
 
