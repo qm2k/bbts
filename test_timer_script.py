@@ -240,6 +240,10 @@ class Test_check_conditions(unittest.TestCase):
             assert not timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 8..9')
             assert timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 14..15')
 
+            assert not timer_script.check_conditions(backup_path, '--weekday Sat,Sun')
+            assert not timer_script.check_conditions(backup_path, '--utc-offset +0300 --weekday Sat,Sun')
+            assert timer_script.check_conditions(backup_path, '--utc-offset=-0700 --weekday Sat,Sun')
+
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())
         assert not timer_script.check_conditions(get_backup_path('empty'))
