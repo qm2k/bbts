@@ -42,12 +42,24 @@ def get_backup(backup_name = 'default'):
 
 
 class FakeTime(object):
-    def __init__(self, text):
-        self.fake_datetime = datetime.datetime.strptime(text, '%Y-%m-%d %H:%M:%S')
+    def __init__(self, time_text, timezone_text = None):
+        self.fake_timezone_text = timezone_text
+        self.fake_datetime = datetime.datetime.strptime(time_text, '%Y-%m-%d %H:%M:%S')
     def __enter__(self):
+        if self.fake_timezone_text:
+            self.saved_timezone_text = os.environ.get('TZ', None)
+            os.environ['TZ'] = self.fake_timezone_text
+            tzinfo = now_tz().tzinfo
+        else:
+            tzinfo = timer_script.CURRENT_DATETIME.tzinfo
         self.saved_datetime = timer_script.CURRENT_DATETIME
-        timer_script.CURRENT_DATETIME = self.fake_datetime.replace(tzinfo = self.saved_datetime.tzinfo)
+        timer_script.CURRENT_DATETIME = self.fake_datetime.replace(tzinfo = tzinfo)
     def __exit__(self, type, value, traceback):
+        if self.fake_timezone_text:
+            if self.saved_timezone_text:
+                os.environ['TZ'] = self.saved_timezone_text
+            else:
+                del os.environ['TZ']
         timer_script.CURRENT_DATETIME = self.saved_datetime
 
 
@@ -142,6 +154,8 @@ class Test_Backup_get_timestamp(unittest.TestCase):
 class Test_check_conditions(unittest.TestCase):
 
     def setUp(self):
+        timer_script.CURRENT_DATETIME = now_tz()
+
         filename = os.path.join(get_backup_path('20h'), 'timestamp')
         timestamp = now_tz() - datetime.timedelta(hours = 20)
         timer_script.write_timestamp(filename, timestamp)
@@ -212,6 +226,19 @@ class Test_check_conditions(unittest.TestCase):
                     universal_newlines = True)
                 assert result.stdout == expected_stdout, (result, expected_stdout)
                 assert result.stderr == '', result
+
+    def test_utc_offset(self):
+        backup_path = get_backup_path()
+        with FakeTime('2017-04-24 14:46:05', 'Asia/Tokyo'):
+            assert not timer_script.check_conditions(backup_path, '--time 13..14')
+            assert timer_script.check_conditions(backup_path, '--time 14..15')
+            assert not timer_script.check_conditions(backup_path, '--time 15..16')
+
+            assert not timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 14..15')
+            assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 8..9')
+            assert timer_script.check_conditions(backup_path, '--utc-offset +0300', '--time 14..15', '--time 8..9')
+            assert not timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 8..9')
+            assert timer_script.check_conditions(backup_path, '--utc-offset +0300 --time 14..15', '--time 14..15')
 
     def test_no_conditions(self):
         assert not timer_script.check_conditions(get_backup_path())
