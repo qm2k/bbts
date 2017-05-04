@@ -28,6 +28,10 @@ import datetime
 import subprocess
 
 
+# simple utility functions included in timer_script
+from timer_script import now_tz, replace_time
+
+
 TEST_BACKUPS = os.path.join(os.path.dirname(__file__), '_test_data', 'backups')
 
 def get_backup_path(backup_name = 'default'):
@@ -42,7 +46,7 @@ class FakeTime(object):
         self.fake_datetime = datetime.datetime.strptime(text, '%Y-%m-%d %H:%M:%S')
     def __enter__(self):
         self.saved_datetime = timer_script.CURRENT_DATETIME
-        timer_script.CURRENT_DATETIME = self.fake_datetime
+        timer_script.CURRENT_DATETIME = self.fake_datetime.replace(tzinfo = self.saved_datetime.tzinfo)
     def __exit__(self, type, value, traceback):
         timer_script.CURRENT_DATETIME = self.saved_datetime
 
@@ -125,11 +129,11 @@ class Test_Backup_get_timestamp(unittest.TestCase):
 
     def test_constant(self):
         expected_result = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
-        assert get_backup('timestamp').get_timestamp() == expected_result
+        assert get_backup('timestamp').get_timestamp().replace(tzinfo = None) == expected_result
 
     def test_dynamic(self):
         backup_path = get_backup_path('dynamic_timestamp')
-        timestamp = datetime.datetime.now()
+        timestamp = now_tz()
         timer_script.write_timestamp(os.path.join(backup_path, 'timestamp'), timestamp)
         expected_result = timestamp.replace(microsecond = 0)
         assert timer_script.Backup(backup_path).get_timestamp() == expected_result
@@ -139,13 +143,11 @@ class Test_check_conditions(unittest.TestCase):
 
     def setUp(self):
         filename = os.path.join(get_backup_path('20h'), 'timestamp')
-        timestamp = datetime.datetime.now() - datetime.timedelta(hours = 20)
+        timestamp = now_tz() - datetime.timedelta(hours = 20)
         timer_script.write_timestamp(filename, timestamp)
 
         filename = os.path.join(get_backup_path('yesterday9'), 'timestamp')
-        timestamp = datetime.datetime.combine(
-            datetime.datetime.now().date() - datetime.timedelta(days = 1),
-            datetime.time(hour = 9))
+        timestamp = replace_time(now_tz() - datetime.timedelta(days = 1), datetime.time(hour = 9))
         timer_script.write_timestamp(filename, timestamp)
 
     def test_help(self):
@@ -183,6 +185,7 @@ class Test_check_conditions(unittest.TestCase):
     def test_verbose(self):
         backup_path = get_backup_path()
         command = (timer_script.__file__, 'test', backup_path, TEST_BACKUPS, '-', '-')
+        MATCHED_DATE = 'Matched date: 2017-05-04T00:00:00+00:00\n'
         NOTHING_MATCHED = 'Nothing matched.\n'
         LAN_MATCHED = 'Matched: --lan\n'
         VERBOSE_LAN_MATCHED = 'Matched: --verbose --lan\n'
@@ -262,7 +265,7 @@ class Test_check_conditions(unittest.TestCase):
         assert os.path.exists(created_timestamp_filename)
         assert not timer_script.check_conditions(backup_path, '--init-exceeds 1h')
 
-        timestamp = datetime.datetime.now() - datetime.timedelta(hours = 20)
+        timestamp = now_tz() - datetime.timedelta(hours = 20)
         timer_script.write_timestamp(created_timestamp_filename, timestamp)
         assert timer_script.check_conditions(backup_path, '--init-exceeds 19h')
         assert not timer_script.check_conditions(backup_path, '--init-exceeds 21h')

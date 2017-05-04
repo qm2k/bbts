@@ -32,7 +32,14 @@ import shlex
 import subprocess
 
 
-CURRENT_DATETIME = datetime.datetime.now()
+def now_tz():
+    return datetime.datetime.now(datetime.timezone.utc).astimezone()
+
+def replace_time(datetime_, time):
+    return datetime.datetime.combine(date = datetime_.date(), time = time).replace(tzinfo = datetime_.tzinfo)
+
+
+CURRENT_DATETIME = now_tz()
 
 
 def match_full(regex, text):
@@ -40,6 +47,10 @@ def match_full(regex, text):
     if not match:
         raise ValueError(text, regex.pattern)
     return match
+
+
+def parse_timezone_offset(text):
+    return datetime.datetime.strptime(text, '%z').tzinfo if text != '-' else None
 
 
 BURP_DURATION_REGEX = re.compile('(?P<number>\d+)(?P<unit>[smhdwn])')
@@ -79,10 +90,14 @@ def read_timestamp(timestamp_filename):
         line = timestamp_file.readline().strip('\n')
         index, timestamp_string = line.split(' ', maxsplit = 1)
         timestamp = datetime.datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
+        # presume current timezone
+        timestamp = timestamp.replace(tzinfo = CURRENT_DATETIME.tzinfo)
         return timestamp
 
 
 def write_timestamp(timestamp_filename, timestamp, index = 0):
+    # write in current timezone
+    timestamp = timestamp.astimezone(CURRENT_DATETIME.tzinfo).replace(tzinfo = None)
     with open(timestamp_filename, 'wt') as timestamp_file:
         timestamp_file.write('{:07} {}\n'.format(index, timestamp.replace(microsecond = 0).isoformat(' ')))
 
@@ -118,7 +133,7 @@ class Backup(object):
 
         return False
 
-    def get_timestamp(self, __new_timestamp = datetime.datetime(1, 1, 1)):
+    def get_timestamp(self, __new_timestamp = datetime.datetime(2001, 1, 1, tzinfo = CURRENT_DATETIME.tzinfo)):
         if self.is_new():
             return __new_timestamp
 
@@ -207,8 +222,9 @@ class Conditions(object):
         )
 
     def reset(self):
-        self.matched_date = CURRENT_DATETIME.date()
         self.verbose = False
+        self.timezone = None
+        self.match_date()
 
     def __init__(self, prior_backup):
         self.prior_backup = prior_backup
@@ -253,34 +269,40 @@ class Conditions(object):
                 kwargs['help'] = 'inverted version of {}'.format(option_name)
         return
 
-    def matched_datetime(self, time_of_day):
-        return datetime.datetime.combine(self.matched_date, datetime.time()) + time_of_day
-
     def weekday(self):
         return self.matched_date.weekday()
 
     def prior_before(self, time_of_day):
-        return self.matched_datetime(time_of_day) > self.prior_backup.get_timestamp()
+        return self.matched_date + time_of_day > self.prior_backup.get_timestamp()
 
-    def match_date(self, time_of_day):
-        self.matched_date = (CURRENT_DATETIME - time_of_day).date()
+    def match_date(self, time_of_day = datetime.timedelta()):
+        self.matched_date = replace_time(CURRENT_DATETIME.astimezone(self.timezone) - time_of_day, datetime.time())
         return True
 
     def match_time_interval(self, interval):
         self.match_date(interval.start)
-        return CURRENT_DATETIME < self.matched_datetime(interval.end)
+        return CURRENT_DATETIME < self.matched_date + interval.end
 
     def check_time_interval(self, interval):
-        return self.matched_datetime(interval.start) <= CURRENT_DATETIME < self.matched_datetime(interval.end)
+        return self.matched_date + interval.start <= CURRENT_DATETIME < self.matched_date + interval.end
 
     def match(self, arguments, environment):
         self.reset()
 
         environment_arguments = {}
+
         self.verbose = environment['verbose']
         if arguments.pop('verbose', None):
             environment_arguments['verbose'] = True
             self.verbose = True
+
+        self.timezone = environment['timezone']
+        utc_offset = arguments.pop('utc_offset', None)
+        if utc_offset:
+            timezone = parse_timezone_offset(utc_offset)
+            environment_arguments['timezone'] = timezone
+            self.timezone = timezone
+        self.match_date()
 
         if arguments.get('after', None) and arguments.get('time', None):
             raise ValueError('Arguments --after and --time are not compatible.')
@@ -328,7 +350,11 @@ def create_parser():
 
     environment_group = parser.add_argument_group(title = 'environment options',
         description = 'acts on a single timer_arg line unless placed on a line of their own')
-    environment_group .add_argument('--verbose', action = 'store_true',
+    environment_group.add_argument('--utc-offset', action = 'store', metavar = 'UTC-OFFSET',
+        help = '; '.join((
+            'UTC offset of configuration day-of-times',
+            'affects --after, --(not-)time, --(not-)weekday, --(not-)prior-before')))
+    environment_group.add_argument('--verbose', action = 'store_true',
         help = 'verbose output')
 
     conditions_group = parser.add_argument_group(title = 'conditions')
@@ -349,7 +375,8 @@ def check_conditions(prior_path, *argument_strings):
         print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...> | --help\n')
         parser.print_help()
         print()
-        print('variable formats:')
+        print('metavariable formats:')
+        print('  {:22}{}'.format('UTC-OFFSET', '+HHMM or -HHMM or -'))
         print('  {:22}{}'.format('IP-NETWORK', 'See ipaddress.ip_network(...)'))
         print('  {:22}{}'.format('TIME-OF-DAY', TIME_OF_DAY_REGEX.pattern))
         print('  {:22}{}'.format('DURATION', BURP_DURATION_REGEX.pattern))
@@ -358,7 +385,7 @@ def check_conditions(prior_path, *argument_strings):
 
     prior_backup = Backup(prior_path)
     conditions = Conditions(prior_backup)
-    environment = {'verbose': False}
+    environment = {'verbose': False, 'timezone': None}
     for argument_string in argument_strings:
         arguments = vars(parser.parse_args(shlex.split(argument_string, comments = True)))
         arguments = dict(arguments) # make a copy
