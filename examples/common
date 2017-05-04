@@ -1,13 +1,13 @@
-timer_arg =  --verbose                                                          # set verbose output globally
-timer_arg =  --utc-offset +0300                                                 # time-of-day values are in Moscow
+timer_arg =  --verbose                                      # set verbose output globally
+timer_arg =  --utc-offset +0300                             # time-of-day values are in Moscow
 
-timer_arg =  --subnet 213.87.128.0/19 --stop                                    # never backup by GPRS
-timer_arg =  --continued                                                        # restart continued backup right away
+timer_arg =  --subnet 213.87.128.0/19  --stop               # never backup by GPRS
+timer_arg =  --continued                                    # restart continued backup right away
 
 # similar rules apply to Full backups
-timer_arg =  --new              --lan  --not-time 8..19                         # create new backups during off-hours
-timer_arg =  --new              --lan  --weekday Sat,Sun                        # or on holidays
-timer_arg =  --init-exceeds 3d  --lan                                           # at least on lan
-timer_arg =  --init-exceeds 1w                                                  # anyhow if it fails for 1 week
-timer_arg =  --new --stop                                                       # but not earlier
+timer_arg =  --new              --lan  --not-time 8..19     # create new backups during off-hours
+timer_arg =  --new              --lan  --weekday Sat,Sun    # or on holidays
+timer_arg =  --init-exceeds 3d  --lan                       # at least on lan
+timer_arg =  --init-exceeds 1w                              # anyhow if it fails for 1 week
+timer_arg =  --new --stop                                   # but not earlier
 

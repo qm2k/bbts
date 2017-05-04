@@ -3,6 +3,6 @@
 # include common settings
 . common
 
-timer_arg =  --prior-before 12  --lan                         --after 19        # start doing backups on lan in the evening
-timer_arg =  --age-exceeds 3d                                                   # anyhow if it fails for 3 days
+timer_arg =  --prior-before 12  --lan  --after 19           # start doing backups on lan in the evening
+timer_arg =  --age-exceeds 3d                               # anyhow if it fails for 3 days
 
