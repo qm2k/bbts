@@ -374,7 +374,7 @@ def check_conditions(prior_path, *argument_strings):
     parser = create_parser()
 
     if '--help' in argument_strings:
-        print('Better BURP Timer Script (BBTS), version 1.0')
+        print('Better BURP Timer Script (BBTS), version 1.0.1')
         print('usage: <client_name> <prior_path> <data_path> <reserverd1> <reserverd2> <timer_args...> | --help\n')
         parser.print_help()
         print()
