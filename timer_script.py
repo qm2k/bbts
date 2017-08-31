@@ -120,16 +120,19 @@ class Backup(object):
         return not os.path.exists(self.path)
 
     def is_continued(self,
-        __interrupted_regex = re.compile('\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
+        __interrupted_regex = re.compile(b'\d{4}-\d\d-\d\d \d\d:\d\d:\d\d: burp\[\d+\] Found interrupted backup.\n'),
     ):
         if self.is_new():
             return False
 
         log_filename = os.path.join(self.path, 'log.gz')
-        with gzip.open(log_filename, 'rt') as log_file:
-            for line in log_file:
-                if __interrupted_regex.fullmatch(line):
-                    return True
+        try:
+            with gzip.open(log_filename, 'rb') as log_file:
+                for line in log_file:
+                    if __interrupted_regex.fullmatch(line):
+                        return True
+        except FileNotFoundError:
+            print('Something is fishy: missing {}'.format(log_filename), file = sys.stderr)
 
         return False
 
