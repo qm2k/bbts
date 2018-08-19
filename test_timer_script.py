@@ -140,8 +140,16 @@ class Test_Backup_is_continued(unittest.TestCase):
 class Test_Backup_get_timestamp(unittest.TestCase):
 
     def test_constant(self):
-        expected_result = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
-        assert get_backup('timestamp').get_timestamp().replace(tzinfo = None) == expected_result
+        base_timestamp = datetime.datetime.strptime('2017-04-05 12:32:07', '%Y-%m-%d %H:%M:%S')
+        for subdirectory, tzinfo in (
+            ('zoneless', timer_script.CURRENT_DATETIME.tzinfo),
+            ('Z', datetime.timezone.utc),
+            ('ISO', datetime.datetime.strptime('-0123', '%z').tzinfo),
+            ('timezone', datetime.datetime.strptime('-0123', '%z').tzinfo),
+            ('truncated', datetime.datetime.strptime('+1200', '%z').tzinfo),
+        ):
+            expected_result = base_timestamp.replace(tzinfo = tzinfo)
+            self.assertEqual(get_backup(os.path.join('timestamps', subdirectory)).get_timestamp(), expected_result)
 
     def test_dynamic(self):
         backup_path = get_backup_path('dynamic_timestamp')

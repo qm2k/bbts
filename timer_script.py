@@ -85,13 +85,25 @@ def parse_time_of_day_interval(text,
     return Interval(*map(parse_time_of_day, match.groups()))
 
 
-def read_timestamp(timestamp_filename):
+def read_timestamp(timestamp_filename, __zoneless_length = len('YYYY-mm-dd HH:MM:SS')):
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
         index, timestamp_string = line.split(' ', maxsplit = 1)
+        timestamp_string, timezone_string = timestamp_string[:__zoneless_length], timestamp_string[__zoneless_length:]
         timestamp = datetime.datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
-        # presume current timezone
-        timestamp = timestamp.replace(tzinfo = CURRENT_DATETIME.tzinfo)
+        timezone_string = timezone_string.lstrip().split(' ', maxsplit = 1)[0].replace(':', '')
+        if timezone_string == '':
+            # presume current timezone
+            tzinfo = CURRENT_DATETIME.tzinfo
+        elif timezone_string == 'Z':
+            tzinfo = datetime.timezone.utc
+        elif timezone_string[0] in '+-':
+            if len(timezone_string) == 3:
+                timezone_string += '00'
+            tzinfo = datetime.datetime.strptime(timezone_string, '%z').tzinfo
+        else:
+            raise ValueError(timezone_string)
+        timestamp = timestamp.replace(tzinfo = tzinfo)
         return timestamp
 
 
