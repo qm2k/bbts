@@ -107,21 +107,19 @@ def read_timestamp(timestamp_filename, __zoneless_length = len('YYYY-mm-dd HH:MM
         return timestamp
 
 
-def write_timestamp(timestamp_filename, timestamp, index = 0):
-    # write in current timezone
-    timestamp = timestamp.astimezone(CURRENT_DATETIME.tzinfo).replace(tzinfo = None)
-    with open(timestamp_filename, 'wt') as timestamp_file:
-        timestamp_file.write('{:07} {}\n'.format(index, timestamp.replace(microsecond = 0).isoformat(' ')))
-
-
 class Backup(object):
 
     def __get_client_created_timestamp(self):
         directory, _ = os.path.split(self.path)
+        filename = os.path.join(directory, '.created')
+        if os.path.exists(filename):
+            return read_timestamp(filename)
         filename = os.path.join(directory, 'created')
         if not os.path.exists(filename):
             os.makedirs(directory, exist_ok = True)
-            write_timestamp(filename, CURRENT_DATETIME)
+            with open(filename, 'wt') as file:
+                # do not add timezone for reverse backward compatibility
+                file.write('{:07} {}\n'.format(0, CURRENT_DATETIME.replace(tzinfo = None, microsecond = 0).isoformat(' ')))
         return read_timestamp(filename)
 
     def __init__(self, path):

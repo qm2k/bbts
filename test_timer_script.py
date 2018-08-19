@@ -40,6 +40,10 @@ def get_backup_path(backup_name = 'default'):
 def get_backup(backup_name = 'default'):
     return timer_script.Backup(get_backup_path(backup_name))
 
+def write_timestamp(filename, timestamp, index = 0):
+    assert timestamp.tzinfo
+    with open(filename, 'wt') as file:
+        file.write('{:07} {:%Y-%m-%d %H:%M:%S %z}\n'.format(index, timestamp))
 
 class FakeTime(object):
     def __init__(self, time_text, timezone_text = None):
@@ -154,7 +158,7 @@ class Test_Backup_get_timestamp(unittest.TestCase):
     def test_dynamic(self):
         backup_path = get_backup_path('dynamic_timestamp')
         timestamp = now_tz()
-        timer_script.write_timestamp(os.path.join(backup_path, 'timestamp'), timestamp)
+        write_timestamp(os.path.join(backup_path, 'timestamp'), timestamp)
         expected_result = timestamp.replace(microsecond = 0)
         assert timer_script.Backup(backup_path).get_timestamp() == expected_result
 
@@ -166,11 +170,11 @@ class Test_check_conditions(unittest.TestCase):
 
         filename = os.path.join(get_backup_path('20h'), 'timestamp')
         timestamp = now_tz() - datetime.timedelta(hours = 20)
-        timer_script.write_timestamp(filename, timestamp)
+        write_timestamp(filename, timestamp)
 
         filename = os.path.join(get_backup_path('yesterday9'), 'timestamp')
         timestamp = replace_time(now_tz() - datetime.timedelta(days = 1), datetime.time(hour = 9))
-        timer_script.write_timestamp(filename, timestamp)
+        write_timestamp(filename, timestamp)
 
     def test_help(self):
         for arguments in (
@@ -297,9 +301,15 @@ class Test_check_conditions(unittest.TestCase):
         backup_path = get_backup_path('dynamic_presence')
         if os.path.exists(backup_path):
             os.rmdir(backup_path)
-        created_timestamp_filename = os.path.join(os.path.split(backup_path)[0], 'created')
-        if os.path.exists(created_timestamp_filename):
-            os.remove(created_timestamp_filename)
+        directory, _ = os.path.split(backup_path)
+
+        basenames = ('created', '.created')
+        for basename in basenames:
+            created_timestamp_filename = os.path.join(directory, basename)
+            if os.path.exists(created_timestamp_filename):
+                os.remove(created_timestamp_filename)
+
+        created_timestamp_filename = os.path.join(directory, basenames[0])
 
         assert not os.path.exists(created_timestamp_filename)
         assert not timer_script.check_conditions(backup_path, '--init-exceeds 1h')
@@ -307,8 +317,17 @@ class Test_check_conditions(unittest.TestCase):
         assert os.path.exists(created_timestamp_filename)
         assert not timer_script.check_conditions(backup_path, '--init-exceeds 1h')
 
+        timestamp = now_tz() - datetime.timedelta(hours = 10)
+        write_timestamp(created_timestamp_filename, timestamp)
+        assert timer_script.check_conditions(backup_path, '--init-exceeds 9h')
+        assert not timer_script.check_conditions(backup_path, '--init-exceeds 11h')
+
+        created_timestamp_filename = os.path.join(directory, basenames[1])
+
+        assert not os.path.exists(created_timestamp_filename)
+
         timestamp = now_tz() - datetime.timedelta(hours = 20)
-        timer_script.write_timestamp(created_timestamp_filename, timestamp)
+        write_timestamp(created_timestamp_filename, timestamp)
         assert timer_script.check_conditions(backup_path, '--init-exceeds 19h')
         assert not timer_script.check_conditions(backup_path, '--init-exceeds 21h')
 
