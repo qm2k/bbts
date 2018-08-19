@@ -3,7 +3,7 @@
 ## Usage
 
 Only `timer_script.py` is needed for production, other files are used for tests and development.
-Put timer_script.py anywhere on your server and specify it in `timer_script` line in server configuration, like:
+Put `timer_script.py` anywhere on your server and specify it in `timer_script` line in server configuration, like:
 
 `timer_script = /opt/local/bin/timer_script.py`
 
@@ -15,4 +15,4 @@ You can specify multiple conditions per line.
 All conditions on any `timer_arg` line must be met for backup to occur.
 Special `--stop` condition stops processing of further lines.
 
-See `examples` directory for configuration examples. Run script without parameters to see all supported conditions.
+See [ANNOUNCE.md](https://github.com/qm2k/bbts/blob/master/ANNOUNCE.md) file for features overview. See [examples](https://github.com/qm2k/bbts/tree/master/examples) directory for configuration examples. Run script without parameters to see all supported conditions.
