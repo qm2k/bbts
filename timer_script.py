@@ -135,6 +135,10 @@ class Backup(object):
         if self.is_new():
             return False
 
+        resumed_filename = os.path.join(self.path, 'resumed')
+        if os.path.exists(resumed_filename):
+            return True
+
         log_filename = os.path.join(self.path, 'log.gz')
         try:
             with gzip.open(log_filename, 'rb') as log_file:

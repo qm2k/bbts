@@ -134,6 +134,9 @@ class Test_parse_time_of_day_interval(unittest.TestCase):
 
 class Test_Backup_is_continued(unittest.TestCase):
 
+    def test_resumed(self):
+        assert get_backup('resumed').is_continued()
+
     def test_continued(self):
         assert get_backup('continued').is_continued()
 
@@ -278,6 +281,7 @@ class Test_check_conditions(unittest.TestCase):
         assert not timer_script.check_conditions(get_backup_path('onepiece'), '--continued # this is another comment --lan')
 
     def test_continued(self):
+        assert timer_script.check_conditions(get_backup_path('resumed'), '--continued')
         assert timer_script.check_conditions(get_backup_path('continued'), '--continued')
         assert not timer_script.check_conditions(get_backup_path('onepiece'))
 
