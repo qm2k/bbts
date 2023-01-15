@@ -144,6 +144,14 @@ class Test_Backup_is_continued(unittest.TestCase):
         assert not get_backup('onepiece').is_continued()
 
 
+class Test_Backup_client_created(unittest.TestCase):
+
+    def test_constant(self):
+        expected_result = datetime.datetime.strptime('2023-01-13 11:39:07 -0500', '%Y-%m-%d %H:%M:%S %z')
+        for subdirectory in ('with_index', 'without_index'):
+            self.assertEqual(get_backup(os.path.join('client_created', subdirectory)).client_created, expected_result)
+
+
 class Test_Backup_get_timestamp(unittest.TestCase):
 
     def test_constant(self):
