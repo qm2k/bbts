@@ -89,6 +89,9 @@ def read_timestamp(timestamp_filename, __zoneless_length = len('YYYY-mm-dd HH:MM
     with open(timestamp_filename, 'rt') as timestamp_file:
         line = timestamp_file.readline().strip('\n')
         index, timestamp_string = line.split(' ', maxsplit = 1)
+        if not index.isdigit():
+            # probably a variant without backup index
+            timestamp_string = line
         timestamp_string, timezone_string = timestamp_string[:__zoneless_length], timestamp_string[__zoneless_length:]
         timestamp = datetime.datetime.strptime(timestamp_string, '%Y-%m-%d %H:%M:%S')
         timezone_string = timezone_string.lstrip().split(' ', maxsplit = 1)[0].replace(':', '')
